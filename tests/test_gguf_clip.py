@@ -5,7 +5,7 @@ import types
 import unittest
 from unittest.mock import patch
 
-spec = importlib.util.spec_from_file_location('gguf_list_test', Path(__file__).with_name('gguf_clip.py'))
+spec = importlib.util.spec_from_file_location('gguf_list_test', Path(__file__).resolve().parent.parent / 'gguf_clip.py')
 module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(module)
 

@@ -10,7 +10,7 @@ import unittest
 
 import torch
 
-ROOT = Path(__file__).parent
+ROOT = Path(__file__).resolve().parent.parent  # plugin root
 spec = importlib.util.spec_from_file_location("fisher_test", ROOT / "__init__.py", submodule_search_locations=[str(ROOT)])
 module = importlib.util.module_from_spec(spec)
 sys.modules[spec.name] = module

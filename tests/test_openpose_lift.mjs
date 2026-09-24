@@ -1,6 +1,6 @@
-// Run: node test_openpose_lift.mjs
+// Run: node tests/test_openpose_lift.mjs
 import assert from 'node:assert/strict';
-import { liftOpenPose, isFacingAway } from './web/editor/openpose-lift.mjs';
+import { liftOpenPose, isFacingAway } from '../web/editor/openpose-lift.mjs';
 
 // Mannequin rest (world units, y up, subject's left at +x), T-pose-ish arms down.
 const rest = {
