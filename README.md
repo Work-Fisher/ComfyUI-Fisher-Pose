@@ -1,3 +1,5 @@
+https://github.com/user-attachments/assets/24dc201a-d9dc-4ac7-86a8-acc9d8f6dd7c
+
 <div align="center">
 
 # Fisher Pose · 机位与姿态
