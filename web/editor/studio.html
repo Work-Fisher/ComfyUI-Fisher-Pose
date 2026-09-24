@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Fisher Pose · 多人机位与姿态</title><link rel="icon" href="data:,"><link rel="stylesheet" href="style.css"><link rel="stylesheet" href="multi.css"></head>
+<body>
+<header class="appbar"><div class="brand"><span class="brand-icon">⌘</span><b>Fisher Pose</b><span class="divider"></span><span>多人机位与姿态</span><small>最多 3 人</small></div><div class="header-actions"><span id="save-status">编辑后应用到节点</span><button id="undo" title="撤销 Ctrl+Z">↶ 撤销</button><button id="redo" title="重做 Ctrl+Shift+Z">↷</button><button id="export-pose">导出人偶图</button><button id="cancel-editor">取消</button><button class="primary" id="apply-editor">应用到节点</button></div></header>
+<main>
+<aside class="left-panel">
+<section><div class="section-heading"><h2>人物 <span id="person-count">1 / 3</span></h2><button class="text-button" id="add-person">＋ 添加</button></div><div id="people-list"></div><div class="person-actions"><button id="duplicate-person">复制人物</button><button id="delete-person">删除</button></div></section>
+<section><div class="section-heading"><h2>动作起点</h2><small>仅应用到选中人物</small></div><div id="pose-presets" class="pose-presets"></div></section>
+<section><div class="section-heading"><h2>参考图</h2><button class="text-button" id="clear-reference" hidden>移除</button></div><label class="upload" id="upload-label"><input type="file" id="reference-file" accept="image/*"><span class="upload-icon">＋</span><b>放入人物参考图</b><small>仅辅助摆姿，不替代 image_1</small></label><div id="fit-reference-options" hidden><label class="field-label">适配范围<select id="fit-scope"><option value="selected">只改选中的人物</option><option value="scene">按整张图重建场景</option></select></label><label class="field-label" id="fit-source-label" hidden>使用图中的哪个人<select id="fit-source"></select></label></div><button id="fit-reference" class="wide" hidden>骨架适配人偶</button><p id="fit-reference-status" class="muted" role="status" hidden>按彩色骨架重建 1–3 人和构图；可撤销。</p><label class="reference-opacity" id="opacity-control" hidden>参考图透明度<input id="opacity" type="range" min="0" max="100" value="25"></label></section>
+<div class="left-note"><p>同一个镜头，独立的动作。<br>点击人物或左侧列表切换。</p></div>
+</aside>
+<div class="workspace"><div class="stage" id="stage"><img id="reference-image" alt="人物参考图" hidden><div id="viewport"></div>
+<div class="stage-top"><div class="segmented" id="display-mode"><button class="active" data-mode="model">人偶</button><button data-mode="skeleton">骨架</button></div><div class="stage-label"><i></i>实时三维预览</div></div>
+<div class="view-cube" aria-label="快捷机位"><button data-view="0,0" class="cube-top" title="正面">正</button><button data-view="90,0" class="cube-side" title="右侧">右</button><button data-view="0,60" class="cube-up" title="俯拍">上</button></div>
+<div class="frame" id="output-frame"><span class="frame-label">拍摄画框 <b id="ratio-label">3:4</b></span><i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i><div class="thirds" hidden></div></div>
+<div class="stage-bottom"><span id="selection-hint">拖身体移动，拖关节摆姿，拖空白转机位</span><button id="center-view">⊙ 框住所有人</button></div><div id="toast" role="status"></div></div>
+<div class="interaction-bar"><span><kbd>点人物</kbd> 选中</span><span><kbd>拖关节</kbd> 摆姿</span><span><kbd>拖身体</kbd> 移动</span><span><kbd>滚轮</kbd> 远近</span></div>
+<section class="shots"><div class="section-heading"><div><h2>镜头收藏 <span id="shot-count">0</span></h2><small>保存全部人物与机位</small></div><button id="save-shot">＋ 保存当前镜头</button></div><div class="shot-strip" id="shot-strip"></div></section></div>
+<aside class="right-panel">
+<div class="panel-tabs"><button class="active" data-tab="camera">镜头</button><button data-tab="pose">人物</button><button data-tab="output">输出</button></div>
+<div id="camera-panel">
+<section><div class="section-heading"><h2>全局拍摄机位</h2><button class="text-button" id="reset-camera">重置</button></div><p class="muted">沿用 Qwen Multiangle 分档，所有人物共用相机。</p>
+<label class="slider-label">水平角度<output id="azimuth-value"></output></label><input id="azimuth" aria-label="水平角度" type="range" min="0" max="359" step="1"><select id="azimuth-preset" aria-label="水平视角预设"><option value="0">正面视角</option><option value="45">右前方视角</option><option value="90">右侧视角</option><option value="135">右后方视角</option><option value="180">背面视角</option><option value="225">左后方视角</option><option value="270">左侧视角</option><option value="315">左前方视角</option></select>
+<label class="slider-label">俯仰角度<output id="elevation-value"></output></label><input id="elevation" aria-label="俯仰角度" type="range" min="-30" max="60" step="1"><select id="elevation-preset" aria-label="俯仰预设"><option value="-30">仰拍</option><option value="0">平视</option><option value="30">高角度</option><option value="60">俯拍</option></select>
+<label class="slider-label">取景远近<output id="zoom-value"></output></label><input id="zoom" aria-label="取景远近" type="range" min="0" max="10" step=".1"><select id="zoom-preset" aria-label="景别预设"><option value="0">远景</option><option value="4">中景</option><option value="8">特写</option></select>
+<div class="camera-summary" id="camera-summary"></div></section>
+<section><div class="section-heading"><h2>构图</h2><button id="toggle-grid" class="text-button" aria-pressed="false">九宫格</button></div><div class="segmented ratios"><button data-ratio="1:1">1:1</button><button class="active" data-ratio="3:4">3:4</button><button data-ratio="16:9">16:9</button></div><div class="dimensions"><label>宽<input id="output-width" type="number" min="64" max="4096" step="1" value="768"></label><label>高<input id="output-height" type="number" min="64" max="4096" step="1" value="1024"></label></div></section>
+</div>
+<div id="pose-panel" hidden>
+<section><div class="section-heading"><h2 id="actor-heading">人物 01</h2><span id="selected-joint">未选择关节</span></div><label class="field-label">人物名称<input id="actor-name" type="text" maxlength="32"></label><label class="field-label">对应原图中的谁<textarea id="actor-identity" maxlength="300" placeholder="例如：图1左侧穿红衣的人"></textarea></label><p class="muted">用于说明骨架与原图人物的对应关系。不会自动识别人脸或锁定身份。</p>
+<label class="slider-label">人物转身<output id="bodyAngle-value"></output></label><input id="bodyAngle" aria-label="人物转身" type="range" min="0" max="359" step="1">
+<p id="actor-facing" class="muted"></p><button id="flip-facing" type="button">转身 180°</button><p class="muted">脸部眼睛和脚下箭头指向人物正面。二维骨架不能自动确定正背面，请在此确认；转身会同时旋转人物姿势。</p>
+<label class="slider-label">左右位置<output id="positionX-value"></output></label><input id="positionX" aria-label="左右位置" type="range" min="-3" max="3" step=".02">
+<label class="slider-label">前后位置<output id="positionZ-value"></output></label><input id="positionZ" aria-label="前后位置" type="range" min="-3" max="3" step=".02">
+<button id="mirror" class="wide">⇄ 镜像当前人物动作</button><button id="reset-pose" class="wide">恢复当前人物站姿</button></section>
+</div>
+<div id="output-panel" hidden>
+<section class="output-settings"><label class="field-label">输出用途<select id="output-mode"><option>视角＋姿态</option><option>仅视角</option><option>仅姿态</option></select></label><p id="mode-help" class="muted"></p><label class="field-label">提示词格式<select id="prompt-style"><option>中文编辑指令</option><option>Multiangle LoRA (&lt;sks&gt;)</option></select></label><p id="style-help" class="muted">中文指令适用于当前 Qwen2.1 工作流。</p><label class="field-label">补充要求<textarea id="extra-prompt" placeholder="例如：保留原图服装与光照"></textarea></label></section>
+</div>
+<section class="description-section"><div class="section-heading"><h2>输出提示词</h2><button id="copy-description" class="text-button">复制</button></div><p id="description"></p><span class="description-note">与当前模式和机位同步</span></section>
+<div class="output-note"><i></i><span>提示词 → prompt<br>合成骨架图 → image_2，原图 → image_1</span></div>
+</aside></main>
+<footer class="app-footer"><span>Fisher Pose <span class="footer-dot">/</span> Multi-person Studio</span><span>编辑后应用到节点，再运行工作流</span></footer>
+<script type="module" src="studio.mjs?v=20260922-preview2"></script></body></html>

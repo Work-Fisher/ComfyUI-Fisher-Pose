@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Fisher Pose · 自由姿势</title><link rel="icon" href="data:,"><link rel="stylesheet" href="style.css"><link rel="stylesheet" href="freepose.css"></head>
+<body>
+<header class="appbar"><div class="brand"><span class="brand-icon">⌘</span><b>Fisher Pose</b><span class="divider"></span><span>自由姿势</span><small>单人 · VNCCS 人偶 · 正面输出</small></div><div class="header-actions"><span id="save-status">编辑后应用到节点</span><button id="undo" title="撤销 Ctrl+Z">↶ 撤销</button><button id="redo" title="重做 Ctrl+Shift+Z">↷</button><button id="cancel-editor">取消</button><button class="primary" id="apply-editor" disabled>应用到节点</button></div></header>
+<main class="fp-main">
+<aside class="left-panel fp-left">
+<section><div class="section-heading"><h2>OpenPose 一键摆姿</h2><span><small id="gallery-count"></small> <button class="text-button" id="clear-gallery" hidden>清空</button></span></div>
+<div class="segmented fp-sources" id="gallery-source"><button data-source="builtin" class="active">FISHER小彩蛋</button><button data-source="library">我的图库</button></div>
+<div class="fp-pick"><label class="fp-button"><input type="file" id="pick-folder" webkitdirectory multiple>选择文件夹</label><label class="fp-button"><input type="file" id="pick-files" accept="image/*" multiple>选择图片</label></div>
+<input id="gallery-filter" class="fp-search" type="search" placeholder="按编号或文件名筛选" hidden>
+<div id="gallery" class="fp-gallery"><p class="muted">选 OpenPose 骨架图（黑底彩色），点缩略图即摆好姿势。也可把图片拖到这里。</p></div>
+<p id="import-status" class="muted" role="status"></p></section>
+<section id="depth-section" hidden><div class="section-heading"><h2>深度修正</h2><small>2D 骨架看不出前后</small></div>
+<div class="fp-flips"><button data-flip="body">正/背面</button><button data-flip="torso">上身前/后倾</button>
+<span>左臂</span><button data-flip="lArmUpper">整条</button><button data-flip="lArmLower">小臂</button>
+<span>右臂</span><button data-flip="rArmUpper">整条</button><button data-flip="rArmLower">小臂</button>
+<span>左腿</span><button data-flip="lLegUpper">整条</button><button data-flip="lLegLower">小腿</button>
+<span>右腿</span><button data-flip="rLegUpper">整条</button><button data-flip="rLegLower">小腿</button></div>
+<p class="muted">点一下把该段在前、后之间翻转。左右指人物自身左右。</p></section>
+<section><div class="section-heading"><h2>手势</h2></div>
+<div class="fp-hands"><span>左手</span><button data-hand="l" data-preset="OPEN">张开</button><button data-hand="l" data-preset="CHOP">并拢</button><button data-hand="l" data-preset="FIST">握拳</button>
+<span>右手</span><button data-hand="r" data-preset="OPEN">张开</button><button data-hand="r" data-preset="CHOP">并拢</button><button data-hand="r" data-preset="FIST">握拳</button></div>
+<label class="slider-label">左手握紧<output id="grip-l-value"></output></label><input id="grip-l" data-hand="l" type="range" min="0" max="1" step="0.01" value="0">
+<label class="slider-label">右手握紧<output id="grip-r-value"></output></label><input id="grip-r" data-hand="r" type="range" min="0" max="1" step="0.01" value="0"></section>
+</aside>
+<div class="workspace"><div class="stage fp-stage" id="stage"><canvas id="viewport-canvas" tabindex="0"></canvas>
+<div class="stage-top"><div class="stage-label"><i></i>橙框 = 正面输出画面</div><button id="snap-view" class="fp-chip">⊙ 回到正面视角</button></div>
+<figure class="fp-inset"><img id="inset-preview" alt="正面输出预览"><figcaption>正面输出</figcaption></figure>
+<div class="stage-bottom"><span id="selection-hint">拖空白处转视角 · 拖关节摆姿 · Shift+拖 移动人物</span><button id="fit-frame">⤢ 人物撑满画框</button></div>
+<div id="loading" class="fp-loading"><div class="fp-spinner"></div><span id="loading-text">正在加载 MakeHuman 人体（约 38MB）…</span></div><div id="toast" role="status"></div></div>
+<div class="interaction-bar"><span><kbd>拖空白</kbd> 转视角</span><span><kbd>拖关节</kbd> 摆姿</span><span><kbd>Shift+拖</kbd> 移动人物</span><span><kbd>右键/中键</kbd> 平移</span><span><kbd>滚轮</kbd> 远近</span></div></div>
+<aside class="right-panel">
+<div class="panel-tabs"><button class="active" data-tab="output">输出</button><button data-tab="pose">关节</button><button data-tab="body">体型</button></div>
+<div id="output-panel">
+<section><div class="section-heading"><h2>人物在画面中</h2><button class="text-button" id="fit-frame-2">撑满</button></div>
+<label class="slider-label">整体转身<output id="turn-value"></output></label><input id="turn" type="range" min="-180" max="180" step="1">
+<div class="fp-presets"><button data-turn="0">正面</button><button data-turn="45">左前</button><button data-turn="90">左侧</button><button data-turn="180">背面</button><button data-turn="-90">右侧</button><button data-turn="-45">右前</button></div>
+<label class="slider-label">大小<output id="zoom-value"></output></label><input id="zoom" type="range" min="0.2" max="6" step="0.01">
+<label class="slider-label">左右<output id="tx-value"></output></label><input id="tx" type="range" min="-20" max="20" step="0.05">
+<label class="slider-label">上下<output id="ty-value"></output></label><input id="ty" type="range" min="-20" max="20" step="0.05"></section>
+<section><div class="section-heading"><h2>人偶图尺寸</h2><small>仅 image1，与节点输出尺寸无关</small></div><div class="segmented ratios" id="ratios"><button data-ratio="1:1">1:1</button><button data-ratio="3:4">3:4</button><button data-ratio="4:3">4:3</button><button data-ratio="9:16">9:16</button><button data-ratio="16:9">16:9</button></div><div class="dimensions"><label>宽<input id="output-width" type="number" min="64" max="4096" step="16"></label><label>高<input id="output-height" type="number" min="64" max="4096" step="16"></label></div></section>
+</div>
+<div id="pose-panel" hidden>
+<section><div class="section-heading"><h2>选中关节</h2><span id="bone-name">未选择</span></div>
+<div id="bone-sliders" class="fp-disabled"><label class="slider-label">X 旋转<output id="rx-value"></output></label><input id="rx" data-axis="x" type="range" min="-180" max="180" step="1"><label class="slider-label">Y 旋转<output id="ry-value"></output></label><input id="ry" data-axis="y" type="range" min="-180" max="180" step="1"><label class="slider-label">Z 旋转<output id="rz-value"></output></label><input id="rz" data-axis="z" type="range" min="-180" max="180" step="1"></div>
+<button id="reset-bone" class="wide">复位选中关节</button><button id="reset-pose" class="wide">恢复站姿</button></section>
+<p class="muted">点关节圆点选中；手、脚、髋部可直接拖动做 IK，点住不动会出现旋转环。手指关节也可单独选中。</p>
+</div>
+<div id="body-panel" hidden>
+<section><div class="section-heading"><h2>体型</h2><button class="text-button" id="reset-body">重置</button></div><div id="body-sliders"></div><p class="muted">体型只影响人偶轮廓，外观仍来自人物图。</p></section>
+</div>
+<section class="description-section"><div class="section-heading"><h2>人偶图 · image1</h2><small id="preview-size"></small></div><img id="capture-preview" alt="人偶图预览"><div id="person-preview-wrap" hidden><div class="section-heading"><h2>人物图 · image2</h2></div><img id="person-preview" alt="人物图"></div></section>
+<section class="description-section"><div class="section-heading"><h2>提示词</h2><button id="copy-description" class="text-button">复制</button></div><label class="field-label">补充要求（建议英文）<textarea id="extra-prompt" placeholder="例如：keep the outfit, soft studio light"></textarea></label><p id="description"></p><span class="description-note">LoRA 训练指令固定，补充内容另起一行附在后面</span></section>
+</aside></main>
+<footer class="app-footer"><span>Fisher Pose <span class="footer-dot">/</span> Free Pose · mannequin core © MiuProject (MIT)</span><span>人偶图 → image_1，人物图 → image_2</span></footer>
+<script type="module" src="freepose.mjs?v=20260924-5"></script></body></html>
