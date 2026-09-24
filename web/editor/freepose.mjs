@@ -19,10 +19,24 @@ const BODY_SLIDERS = [
     ['weight', '体重', 0, 1, 0.01], ['muscle', '肌肉', 0, 1, 0.01],
 ];
 const NEUTRAL_TRANSFORM = { x: 0, y: 0, z: 0, zoom: 1 };
+// Head / neck / torso / limb proportions as scale factors (1 = MakeHuman default).
+const PROPORTIONS = [
+    ['head', '头部大小', 0.75, 1.3], ['neck', '脖子长度', 0.5, 2],
+    ['shoulder', '肩宽', 0.7, 1.4], ['spine', '躯干长度', 0.7, 1.4],
+    ['upper_arm', '上臂长度', 0.6, 1.6], ['forearm', '小臂长度', 0.6, 1.6],
+    ['thigh', '大腿长度', 0.6, 1.6], ['shin', '小腿长度', 0.6, 1.6],
+];
+const DEFAULT_PROPORTIONS = Object.fromEntries(PROPORTIONS.map(([key]) => [key, 1]));
+// VNCCS bone-length groups (both sides together); the core maps a group value v to scale 0.5 + v.
+const PROPORTION_GROUPS = {
+    shoulder: ['shoulder_l', 'shoulder_r'], spine: ['spine'],
+    upper_arm: ['upper_arm_l', 'upper_arm_r'], forearm: ['forearm_l', 'forearm_r'],
+    thigh: ['thigh_l', 'thigh_r'], shin: ['shin_l', 'shin_r'],
+};
 // Our 2D joint names → MakeHuman bones whose head sits on that joint.
 const JOINT_BONES = { ls: 'upperarm_l', le: 'lowerarm_l', lw: 'hand_l', rs: 'upperarm_r', re: 'lowerarm_r', rw: 'hand_r', lh: 'thigh_l', lk: 'calf_l', la: 'foot_l', rh: 'thigh_r', rk: 'calf_r', ra: 'foot_r' };
 
-let doc = { mesh: { ...DEFAULT_MESH }, pose: null, transform: { ...NEUTRAL_TRANSFORM }, width: 1024, height: 1024, openpose: null };
+let doc = { mesh: { ...DEFAULT_MESH }, proportions: { ...DEFAULT_PROPORTIONS }, pose: null, transform: { ...NEUTRAL_TRANSFORM }, width: 1024, height: 1024, openpose: null };
 let extraPrompt = '';
 let pack = null;
 let ready = false;
@@ -91,10 +105,41 @@ function savedPose() {
     return pose;
 }
 
+// The core has no neck group, so the neck scales the head bone's offset from neck_01
+// the same way its limb groups scale child offsets, and caches it as the new rest.
+function applyNeck() {
+    viewer._setBoneOffsetScale('head', doc.proportions.neck);
+    for (const bone of viewer.boneList) bone.updateMatrixWorld(true);
+    viewer.skeleton?.update();
+    viewer._cacheShapedRestBonePositions(['head']);
+    viewer.updateIKEffectorPositions?.();
+    viewer.requestRender();
+}
+
+function setProportion(key, value) {
+    doc.proportions = { ...doc.proportions, [key]: value };
+    if (key === 'head') viewer.updateHeadScale(value);
+    else if (key === 'neck') applyNeck();
+    else for (const group of PROPORTION_GROUPS[key]) viewer.updateBoneLengthScale(group, value - 0.5);
+}
+
+// resetPose() restores the core's own groups but not our neck offset.
+function resetPose() {
+    viewer.resetPose();
+    applyNeck();
+}
+
 function loadModel(pose) {
     const morph = solveMorph(pack, doc.mesh);
     viewer.setSkinMode('naked');
+    // loadData() applies these cached scales while it builds the new rig.
+    viewer.headScale = doc.proportions.head;
+    viewer.boneLengthParams = {
+        ...viewer.boneLengthParams,
+        ...Object.fromEntries(Object.entries(PROPORTION_GROUPS).flatMap(([key, groups]) => groups.map(group => [group, doc.proportions[key] - 0.5]))),
+    };
     viewer.loadData(modelData(morph, buildStaticModelData(pack, morph.includeGenitals)), true);
+    applyNeck();
     viewer.updateLights(CAPTURE_LIGHTS);
     if (pose) viewer.setPose(pose, true);
     viewer.setActiveCharacterAppearance({ color: '#ffffff', transform: doc.transform });
@@ -158,7 +203,7 @@ function applyOpenPose() {
     viewer.recordState();
     doc.transform = { ...NEUTRAL_TRANSFORM };
     viewer.setActiveCharacterAppearance({ transform: doc.transform });
-    viewer.resetPose();
+    resetPose();
     viewer.skinnedMesh.updateMatrixWorld(true);
     const { rest, head, pelvis } = restJoints();
     const { kps, facingAway } = liftOpenPose(points, rest, flips);
@@ -411,6 +456,10 @@ function refreshControls() {
         if (input) { input.value = doc.mesh[key]; setOutput(`body-${key}`, key === 'age' ? String(doc.mesh[key]) : Number(doc.mesh[key]).toFixed(2)); }
     }
     for (const side of ['l', 'r']) setOutput(`grip-${side}`, Number($(`#grip-${side}`).value).toFixed(2));
+    for (const [key] of PROPORTIONS) {
+        const input = $(`#prop-${key}`);
+        if (input) { input.value = doc.proportions[key]; setOutput(`prop-${key}`, `${Math.round(doc.proportions[key] * 100)}%`); }
+    }
     $('#description').textContent = promptText();
     refreshBoneSliders();
 }
@@ -464,7 +513,7 @@ for (const side of ['l', 'r']) {
 $('#snap-view').onclick = () => updateCamera(true);
 $('#fit-frame').onclick = $('#fit-frame-2').onclick = () => { viewer.recordState(); fitFrame(); };
 $('#reset-bone').onclick = () => { viewer.recordState(); viewer.resetSelectedBone(); refreshControls(); schedulePreview(); };
-$('#reset-pose').onclick = () => { viewer.recordState(); viewer.resetPose(); doc.openpose = null; refreshFlips(); refreshControls(); schedulePreview(); };
+$('#reset-pose').onclick = () => { viewer.recordState(); resetPose(); doc.openpose = null; refreshFlips(); refreshControls(); schedulePreview(); };
 $('#undo').onclick = () => viewer.undo();
 $('#redo').onclick = () => viewer.redo();
 
@@ -495,10 +544,25 @@ for (const [key, label, min, max, step] of BODY_SLIDERS) {
 }
 $('#reset-body').onclick = () => { doc.mesh = { ...DEFAULT_MESH }; loadModel(rotationsOnly(viewer.getPose())); updateCamera(false); };
 
+const proportionContainer = $('#proportion-sliders');
+for (const [key, label, min, max] of PROPORTIONS) {
+    proportionContainer.insertAdjacentHTML('beforeend', `<label class="slider-label">${label}<output id="prop-${key}-value"></output></label><input id="prop-${key}" type="range" min="${min}" max="${max}" step="0.01">`);
+    $(`#prop-${key}`).addEventListener('input', event => {
+        setProportion(key, Number(event.target.value));
+        refreshControls();
+        schedulePreview();
+    });
+}
+$('#reset-proportions').onclick = () => {
+    for (const [key] of PROPORTIONS) setProportion(key, 1);
+    refreshControls();
+    schedulePreview();
+};
+
 for (const button of document.querySelectorAll('.panel-tabs button')) {
     button.onclick = () => {
         for (const other of document.querySelectorAll('.panel-tabs button')) other.classList.toggle('active', other === button);
-        for (const tab of ['output', 'pose', 'body']) $(`#${tab}-panel`).hidden = tab !== button.dataset.tab;
+        for (const tab of ['output', 'pose', 'body', 'proportion']) $(`#${tab}-panel`).hidden = tab !== button.dataset.tab;
     };
 }
 $('#extra-prompt').addEventListener('input', event => { extraPrompt = event.target.value; refreshControls(); });
@@ -529,6 +593,7 @@ function applyPayload(payload) {
     if (restored) {
         doc = {
             mesh: { ...DEFAULT_MESH, ...saved.mesh, breast_size: 0 }, pose: saved.pose || null, // flat chest is fixed
+            proportions: { ...DEFAULT_PROPORTIONS, ...saved.proportions },
             transform: { ...NEUTRAL_TRANSFORM, ...saved.transform },
             // The mannequin size lives only here; the node's width/height are the separate output size.
             width: round16(Number(saved.width) || doc.width), height: round16(Number(saved.height) || doc.height),
