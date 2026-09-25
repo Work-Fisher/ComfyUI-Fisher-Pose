@@ -43,3 +43,11 @@
 .fp-spinner{width:30px;height:30px;border:3px solid #ffffff30;border-top-color:#8aa4ff;border-radius:50%;animation:fp-spin 1s linear infinite}
 @keyframes fp-spin{to{transform:rotate(360deg)}}
 .fp-sources{margin-bottom:10px}.fp-sources button{padding:6px 4px;font-size:11px}
+.fp-save{margin-bottom:10px;border-color:#c5d2fb;color:#3858cc;background:#f3f6ff}
+.fp-save:hover{background:#e8eeff}
+.fp-saved .fp-thumb{background:#fff;border-color:#e3e8f1;aspect-ratio:1}
+.fp-saved .fp-thumb.active{border-color:#6e8cff}
+.fp-saved .fp-thumb span{color:#fff;background:#1a1f2ecc;font-size:9px;padding:2px 4px}
+.fp-delete{position:absolute;top:3px;right:3px;width:18px;height:18px;border-radius:50%;background:#1a1f2eb0;color:#fff;font-size:12px;font-style:normal;line-height:18px;text-align:center;opacity:0;cursor:pointer}
+.fp-saved .fp-thumb:hover .fp-delete{opacity:1}
+.fp-delete:hover{background:#e5484d}

@@ -385,6 +385,111 @@ galleryBox.addEventListener('dragover', event => { event.preventDefault(); galle
 galleryBox.addEventListener('dragleave', () => galleryBox.classList.remove('drag'));
 galleryBox.addEventListener('drop', event => { event.preventDefault(); galleryBox.classList.remove('drag'); addFiles(event.dataTransfer.files); });
 
+// --- 我的姿势: whole editor states saved on the server (see saved_poses.py) ---
+
+const SAVED_URL = '/fisher_pose/saved_poses';
+let savedPoses = [];
+let savedAvailable = false;
+let activeSavedName = null;
+
+function renderSaved() {
+    const container = $('#saved-poses');
+    $('#save-pose').disabled = !savedAvailable;
+    $('#saved-count').textContent = savedPoses.length ? `${savedPoses.length} 个` : '';
+    if (!savedAvailable) { container.innerHTML = '<p class="muted">在 ComfyUI 中打开编辑器才能保存姿势。</p>'; return; }
+    if (!savedPoses.length) { container.innerHTML = '<p class="muted">摆好的姿势点上面的按钮存下来，下次打开点缩略图就能恢复，换工作流也能用。</p>'; return; }
+    container.replaceChildren(...savedPoses.map(entry => {
+        const button = document.createElement('button');
+        button.className = 'fp-thumb' + (entry.name === activeSavedName ? ' active' : '');
+        button.title = `${entry.name}\n点击载入`;
+        button.innerHTML = '<img alt=""><span></span><i class="fp-delete" title="删除">×</i>';
+        button.querySelector('img').src = entry.thumbnail;
+        button.querySelector('span').textContent = entry.name;
+        button.onclick = event => (event.target.closest('.fp-delete') ? deleteSavedPose(entry) : loadSavedPose(entry));
+        return button;
+    }));
+}
+
+async function loadSavedList() {
+    try {
+        const response = await fetch(SAVED_URL, { cache: 'no-store' });
+        if (response.ok) {
+            savedPoses = (await response.json()).poses;
+            savedAvailable = true;
+        }
+    } catch { /* standalone preview without the ComfyUI server */ }
+    renderSaved();
+}
+
+// Named after the OpenPose image it came from when there is one, else 姿势 N; never an existing name.
+function defaultPoseName() {
+    const taken = new Set(savedPoses.map(entry => entry.name));
+    const base = doc.openpose?.name ? doc.openpose.name.replace(/[\\/:*?"<>|]/g, ' ').trim() : '姿势';
+    if (doc.openpose?.name && !taken.has(base)) return base;
+    for (let n = savedPoses.length + 1; ; n++) if (!taken.has(`${base} ${n}`)) return `${base} ${n}`;
+}
+
+const postPose = (name, record, overwrite) => fetch(SAVED_URL, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, record, overwrite }),
+});
+
+async function saveCurrentPose(presetName) {
+    if (!savedAvailable || !ready) return;
+    const name = (typeof presetName === 'string' ? presetName : prompt('给这个姿势起个名字', defaultPoseName()))?.trim();
+    if (!name) return;
+    await viewer.waitForCaptureReady();
+    const scale = 256 / Math.max(doc.width, doc.height);
+    const thumbnail = capture(Math.round(doc.width * scale), Math.round(doc.height * scale));
+    updateCamera(false);
+    const record = {
+        version: 1, thumbnail,
+        doc: { ...doc, pose: savedPose() },
+        grips: { l: Number($('#grip-l').value), r: Number($('#grip-r').value) },
+    };
+    try {
+        let response = await postPose(name, record, false);
+        if (response.status === 409) {
+            if (!confirm(`已有名为「${name}」的姿势，要覆盖吗？`)) return;
+            response = await postPose(name, record, true);
+        }
+        const result = await response.json();
+        if (!response.ok) { toast(result.error || '保存失败'); return; }
+        activeSavedName = result.name;
+        await loadSavedList();
+        toast(`已保存「${result.name}」`);
+    } catch { toast('保存失败：连不上 ComfyUI'); }
+}
+
+async function loadSavedPose(entry) {
+    try {
+        const response = await fetch(`${SAVED_URL}/${encodeURIComponent(entry.name)}`, { cache: 'no-store' });
+        if (!response.ok) { toast('这个姿势已经不存在了'); await loadSavedList(); return; }
+        const record = await response.json();
+        viewer.recordState();
+        doc = docFrom(record.doc);
+        loadModel(doc.pose);
+        for (const side of ['l', 'r']) $(`#grip-${side}`).value = record.grips?.[side] ?? 0;
+        updateCamera(true);
+        refreshFlips();
+        activeSavedName = entry.name;
+        for (const button of document.querySelectorAll('#gallery .fp-thumb')) button.classList.toggle('active', button.dataset.key === doc.openpose?.key);
+        renderSaved();
+        $('#import-status').textContent = `已载入「${entry.name}」。`;
+    } catch (error) { toast(`载入失败：${error.message}`); }
+}
+
+async function deleteSavedPose(entry, skipConfirm = false) {
+    if (!skipConfirm && !confirm(`删除姿势「${entry.name}」？`)) return;
+    try {
+        await fetch(`${SAVED_URL}/${encodeURIComponent(entry.name)}/delete`, { method: 'POST' });
+        if (activeSavedName === entry.name) activeSavedName = null;
+        await loadSavedList();
+        toast(`已删除「${entry.name}」`);
+    } catch { toast('删除失败：连不上 ComfyUI'); }
+}
+
+$('#save-pose').onclick = () => saveCurrentPose();
+
 // --- Viewport interaction: our editor's feel on top of the VNCCS core -------
 
 function setupInteraction() {
@@ -587,19 +692,22 @@ async function serialize() {
     return JSON.stringify({ version: 2, kind: 'vnccs-free-pose', ...doc, camera: FRONT, poseReference });
 }
 
+// Shared by the node payload and 我的姿势: any saved editor state → a complete doc.
+function docFrom(saved) {
+    return {
+        mesh: { ...DEFAULT_MESH, ...saved.mesh, breast_size: 0 }, pose: saved.pose || null, // flat chest is fixed
+        proportions: { ...DEFAULT_PROPORTIONS, ...saved.proportions },
+        transform: { ...NEUTRAL_TRANSFORM, ...saved.transform },
+        // The mannequin size lives only here; the node's width/height are the separate output size.
+        width: round16(Number(saved.width) || doc.width), height: round16(Number(saved.height) || doc.height),
+        openpose: saved.openpose || null,
+    };
+}
+
 function applyPayload(payload) {
     const saved = JSON.parse(payload.pose_json || '{}');
     const restored = saved.kind === 'vnccs-free-pose';
-    if (restored) {
-        doc = {
-            mesh: { ...DEFAULT_MESH, ...saved.mesh, breast_size: 0 }, pose: saved.pose || null, // flat chest is fixed
-            proportions: { ...DEFAULT_PROPORTIONS, ...saved.proportions },
-            transform: { ...NEUTRAL_TRANSFORM, ...saved.transform },
-            // The mannequin size lives only here; the node's width/height are the separate output size.
-            width: round16(Number(saved.width) || doc.width), height: round16(Number(saved.height) || doc.height),
-            openpose: saved.openpose || null,
-        };
-    }
+    if (restored) doc = docFrom(saved);
     extraPrompt = payload.extra_prompt || '';
     $('#extra-prompt').value = extraPrompt;
     if (payload.referencePreview) {
@@ -620,6 +728,7 @@ async function start(payload) {
     refreshFlips();
     void loadBuiltin();
     void loadLibrary();
+    void loadSavedList();
     await viewer.waitForCaptureReady();
     $('#loading').hidden = true;
     $('#apply-editor').disabled = false;
@@ -649,7 +758,7 @@ function showError(error) {
 }
 
 if (!embedded) { $('#apply-editor').hidden = true; $('#cancel-editor').hidden = true; }
-window.freePose = { viewer, get doc() { return doc; }, serialize, prompt: promptText, fitFrame, importEntry, addFiles };
+window.freePose = { viewer, get doc() { return doc; }, serialize, prompt: promptText, fitFrame, importEntry, addFiles, saveCurrentPose, loadSavedPose, deleteSavedPose };
 
 (async () => {
     await viewer.init();

@@ -6,6 +6,7 @@
 python -m unittest discover -s tests -p "test_pose*.py"
 python -m unittest discover -s tests -p "test_pe_rewrite.py"
 python -m unittest discover -s tests -p "test_gguf_clip.py"
+python tests/test_saved_poses.py
 python tests/test_free_pose.py <ComfyUI 目录>
 python tests/test_qwen_bridge.py <ComfyUI 目录>
 node tests/test_openpose_lift.mjs

@@ -4,7 +4,7 @@ import { api } from "../../scripts/api.js";
 const EDITORS = {
     studio: { url: new URL("./editor/studio.html", import.meta.url), version: "20260922-preview2", title: "Fisher 机位与姿态编辑器",
               fields: ["scene_json", "output_mode", "width", "height", "extra_prompt"], data: "scene_json", image: "reference_image_1" },
-    freePose: { url: new URL("./editor/freepose.html", import.meta.url), version: "20260924-6", title: "Fisher 自由姿势编辑器",
+    freePose: { url: new URL("./editor/freepose.html", import.meta.url), version: "20260926-1", title: "Fisher 自由姿势编辑器",
                 fields: ["pose_json", "extra_prompt"], data: "pose_json", image: "reference_image" },
 };
 const editorFor = node => (node.comfyClass || node.type) === "FisherQwenFreePose" ? EDITORS.freePose : EDITORS.studio;

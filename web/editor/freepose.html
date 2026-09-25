@@ -10,6 +10,9 @@
 <input id="gallery-filter" class="fp-search" type="search" placeholder="按编号或文件名筛选" hidden>
 <div id="gallery" class="fp-gallery"><p class="muted">选 OpenPose 骨架图（黑底彩色），点缩略图即摆好姿势。也可把图片拖到这里。</p></div>
 <p id="import-status" class="muted" role="status"></p></section>
+<section id="saved-section"><div class="section-heading"><h2>我的姿势</h2><small id="saved-count"></small></div>
+<button id="save-pose" class="wide fp-save">＋ 保存当前姿势</button>
+<div id="saved-poses" class="fp-gallery fp-saved"></div></section>
 <section id="depth-section" hidden><div class="section-heading"><h2>深度修正</h2><small>2D 骨架看不出前后</small></div>
 <div class="fp-flips"><button data-flip="body">正/背面</button><button data-flip="torso">上身前/后倾</button>
 <span>左臂</span><button data-flip="lArmUpper">整条</button><button data-flip="lArmLower">小臂</button>
@@ -56,4 +59,4 @@
 <section class="description-section"><div class="section-heading"><h2>提示词</h2><button id="copy-description" class="text-button">复制</button></div><label class="field-label">补充要求（建议英文）<textarea id="extra-prompt" placeholder="例如：keep the outfit, soft studio light"></textarea></label><p id="description"></p><span class="description-note">LoRA 训练指令固定，补充内容另起一行附在后面</span></section>
 </aside></main>
 <footer class="app-footer"><span>Fisher Pose <span class="footer-dot">/</span> Free Pose · mannequin core © MiuProject (MIT)</span><span>人偶图 → image_1，人物图 → image_2</span></footer>
-<script type="module" src="freepose.mjs?v=20260924-6"></script></body></html>
+<script type="module" src="freepose.mjs?v=20260926-1"></script></body></html>
