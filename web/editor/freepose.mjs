@@ -35,6 +35,17 @@ const PROPORTION_GROUPS = {
 };
 // Our 2D joint names → MakeHuman bones whose head sits on that joint.
 const JOINT_BONES = { ls: 'upperarm_l', le: 'lowerarm_l', lw: 'hand_l', rs: 'upperarm_r', re: 'lowerarm_r', rw: 'hand_r', lh: 'thigh_l', lk: 'calf_l', la: 'foot_l', rh: 'thigh_r', rk: 'calf_r', ra: 'foot_r' };
+// The MakeHuman body pack ships uncompressed: cloud drives (网盘) delete archive files such as the
+// upstream .bin.gz, which left the editor stuck on loading. The .gz is only a fallback for old copies;
+// the VNCCS loader accepts both (it checks the gzip magic bytes).
+const BODY_PACK_URLS = ['pose_studio_makehuman.v2.bin', 'pose_studio_makehuman.v2.bin.gz'].map(name => new URL(`../vnccs/assets/${name}`, import.meta.url));
+
+async function loadBodyPack() {
+    for (const url of BODY_PACK_URLS) {
+        try { return await loadMorphPack(url); } catch { /* missing or truncated: try the next copy */ }
+    }
+    throw new Error('人体数据文件缺失或不完整（web/vnccs/assets/pose_studio_makehuman.v2.bin，约 86MB）。可能被网盘删除或没下载完整，请从 GitHub 重新下载插件：github.com/Work-Fisher/ComfyUI-Fisher-Pose');
+}
 
 let doc = { mesh: { ...DEFAULT_MESH }, proportions: { ...DEFAULT_PROPORTIONS }, pose: null, transform: { ...NEUTRAL_TRANSFORM }, width: 1024, height: 1024, openpose: null };
 let extraPrompt = '';
@@ -767,7 +778,7 @@ window.freePose = { viewer, get doc() { return doc; }, serialize, prompt: prompt
     viewer.setDirectionalSkydomeVisible(false);
     refreshControls();
     if (embedded) parent.postMessage({ type: 'fisher-ready' }, location.origin);
-    pack = await loadMorphPack();
+    pack = await loadBodyPack();
     if (embedded && !pendingPayload) return; // start() runs when the node payload arrives
     await start(pendingPayload);
 })().catch(showError);

@@ -60,6 +60,8 @@ git clone https://github.com/Work-Fisher/ComfyUI-Fisher-Pose.git
 
 装好后重启 ComfyUI 并刷新浏览器。插件不需要额外安装 Python 依赖，节点搜 `Fisher` 就能找到。
 
+也可以在 GitHub 页面点 Code → Download ZIP，解压后把文件夹放进 `custom_nodes`。从网盘下载的请确认 `web/vnccs/assets/` 里有约 86MB 的 `pose_studio_makehuman.v2.bin`，缺了它编辑器打不开人偶。
+
 **自由姿势需要的模型：**
 
 | 文件 | 放到 | 说明 |
