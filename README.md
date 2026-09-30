@@ -28,6 +28,7 @@ https://github.com/user-attachments/assets/24dc201a-d9dc-4ac7-86a8-acc9d8f6dd7c
 ### 自由姿势亮点
 
 - **真人比例人偶**：采用 [VNCCS Pose Studio](https://github.com/AHEKOT/ComfyUI_VNCCS_Utils) 的 MakeHuman 人偶，和 LoRA 训练时用的人偶一致，模型认得出。
+- **从人物图识别姿势**：在编辑器里点一下，用 DWPose 读出人物图里的姿势，人偶直接摆好，再在 3D 里微调。需要装 [comfyui_controlnet_aux](https://github.com/Fannovel16/comfyui_controlnet_aux)，没装时按钮不出现。
 - **OpenPose 一键摆姿**：点一张彩色骨架图就能摆好。2D 骨架没有前后信息，插件按骨长缩短量推算深度；估错时，躯干和四肢各段都能一键在前后之间翻转。
 - **常用姿势**：29 个日常姿势（站、坐、跪、蹲、走、跑、叉腰、抱胸、挥手、敬礼、侧身、背面等），直接按 3D 方向定义，套在任何体型上都准，不会有 2D 骨架的前后歧义。
 - **FISHER小彩蛋**：内置 209 张骨架图，涵盖站、坐、跪、蹲、躺、劈叉、悬空等姿势，打开就能点。

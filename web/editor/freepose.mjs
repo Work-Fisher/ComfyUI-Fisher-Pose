@@ -56,6 +56,7 @@ let selectedBoneName = null;
 let previewTimer = null;
 let morphTimer = null;
 let personAspect = null; // width / height of the connected person photo, when known
+let personPreviewUrl = null;
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 const round16 = value => clamp(Math.round(value / 16) * 16, 64, 4096);
@@ -255,6 +256,80 @@ function applyCommonPose(entry) {
     $('#import-status').textContent = `已摆成「${entry.name}」。可以再拖关节微调。`;
 }
 
+// Returns a short note for the status line.
+function poseFromSkeleton(image, key, label) {
+    const people = readSkeletonImage(image);
+    // Single-person editor: take the tallest skeleton.
+    const height = person => Math.max(...Object.values(person).map(p => p[1])) - Math.min(...Object.values(person).map(p => p[1]));
+    const person = people.slice().sort((a, b) => height(b) - height(a))[0];
+    doc.openpose = { key, name: label, points: person, flips: {} };
+    const notes = [applyOpenPose() ? '识别为背面' : '识别为正面'];
+    if (people.length > 1) notes.push(`图中 ${people.length} 人，已取最大的一个`);
+    if (people.warnings?.length) notes.push('遮挡关节已近似补全');
+    return notes.join('，');
+}
+
+// 从人物图识别姿势: DWPose (comfyui_controlnet_aux) runs on the person photo through ComfyUI's own
+// queue, then its skeleton poses the mannequin like any OpenPose image. Body only; hands and face are
+// left to the hand presets.
+const DWPOSE_MODELS = { bbox_detector: 'yolox_l.torchscript.pt', pose_estimator: 'dw-ll_ucoco_384_bs5.torchscript.pt' };
+
+async function dwposeAvailable() {
+    try {
+        const response = await fetch('/object_info/DWPreprocessor', { cache: 'no-store' });
+        return response.ok && Boolean((await response.json()).DWPreprocessor);
+    } catch { return false; }
+}
+
+function pickOption(options, preferred) {
+    return options?.includes(preferred) ? preferred : options?.find(option => option !== 'None') ?? preferred;
+}
+
+async function detectPersonPose() {
+    const status = $('#import-status');
+    const button = $('#detect-person');
+    button.disabled = true;
+    try {
+        status.textContent = '正在上传人物图…';
+        const blob = await (await fetch(personPreviewUrl)).blob();
+        const form = new FormData();
+        // Named by content, so detecting the same photo again reuses one copy in input/fisher_pose.
+        const bytes = new Uint8Array(await blob.arrayBuffer());
+        let hash = 2166136261;
+        for (let i = 0; i < bytes.length; i++) hash = Math.imul(hash ^ bytes[i], 16777619);
+        form.append('image', blob, `person_${(hash >>> 0).toString(16)}_${bytes.length.toString(16)}.png`);
+        form.append('overwrite', 'true');
+        form.append('subfolder', 'fisher_pose');
+        form.append('type', 'input');
+        const upload = await (await fetch('/upload/image', { method: 'POST', body: form })).json();
+        const info = (await (await fetch('/object_info/DWPreprocessor')).json()).DWPreprocessor.input.optional;
+        const prompt = {
+            1: { class_type: 'LoadImage', inputs: { image: `${upload.subfolder ? upload.subfolder + '/' : ''}${upload.name}` } },
+            2: { class_type: 'DWPreprocessor', inputs: { image: ['1', 0], detect_hand: 'disable', detect_body: 'enable', detect_face: 'disable', resolution: 1024,
+                bbox_detector: pickOption(info.bbox_detector?.[0], DWPOSE_MODELS.bbox_detector), pose_estimator: pickOption(info.pose_estimator?.[0], DWPOSE_MODELS.pose_estimator) } },
+            3: { class_type: 'PreviewImage', inputs: { images: ['2', 0] } },
+        };
+        const queued = await (await fetch('/prompt', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt }) })).json();
+        if (!queued.prompt_id) throw new Error(queued.error?.message || 'ComfyUI 没有接受识别任务');
+        status.textContent = '正在识别姿势（ComfyUI 队列里有别的任务时会等它跑完）…';
+        let result = null;
+        for (let i = 0; i < 600 && !result; i++) {
+            await new Promise(resolve => setTimeout(resolve, 500));
+            result = (await (await fetch(`/history/${queued.prompt_id}`, { cache: 'no-store' })).json())[queued.prompt_id];
+        }
+        if (!result) throw new Error('等待超时');
+        if (result.status?.status_str === 'error') throw new Error('DWPose 运行出错，请看 ComfyUI 控制台');
+        const output = result.outputs?.['3']?.images?.[0];
+        if (!output) throw new Error('没有得到骨架图');
+        const image = new Image();
+        image.src = '/view?' + new URLSearchParams({ filename: output.filename, subfolder: output.subfolder || '', type: output.type || 'temp' });
+        await image.decode();
+        status.textContent = `已按人物图摆好：${poseFromSkeleton(image, 'photo', '人物图')}。前后不对可用下方深度修正，手势请在「手势」里选。`;
+    } catch (error) {
+        status.textContent = `识别失败：${error.message.includes('未识别到') ? '图里没有检测到完整的人' : error.message}`;
+    } finally { button.disabled = false; }
+}
+
 async function importEntry(entry) {
     const status = $('#import-status');
     for (const button of document.querySelectorAll('.fp-thumb')) button.classList.toggle('active', button.dataset.key === entry.key);
@@ -263,16 +338,7 @@ async function importEntry(entry) {
         const image = new Image();
         image.src = entry.url;
         await image.decode();
-        const people = readSkeletonImage(image);
-        // Single-person editor: take the tallest skeleton.
-        const height = person => Math.max(...Object.values(person).map(p => p[1])) - Math.min(...Object.values(person).map(p => p[1]));
-        const person = people.slice().sort((a, b) => height(b) - height(a))[0];
-        doc.openpose = { key: entry.key, name: label, points: person, flips: {} };
-        const facingAway = applyOpenPose();
-        const notes = [facingAway ? '识别为背面' : '识别为正面'];
-        if (people.length > 1) notes.push(`图中 ${people.length} 人，已取最大的一个`);
-        if (people.warnings?.length) notes.push('遮挡关节已近似补全');
-        status.textContent = `已按「${label}」摆好：${notes.join('，')}。前后不对可用下方深度修正。`;
+        status.textContent = `已按「${label}」摆好：${poseFromSkeleton(image, entry.key, label)}。前后不对可用下方深度修正。`;
     } catch (error) {
         entry.failed = true;
         document.querySelector(`.fp-thumb[data-key="${CSS.escape(entry.key)}"]`)?.classList.add('failed');
@@ -526,6 +592,7 @@ async function deleteSavedPose(entry, skipConfirm = false) {
 }
 
 $('#save-pose').onclick = () => saveCurrentPose();
+$('#detect-person').onclick = detectPersonPose;
 
 // --- Viewport interaction: our editor's feel on top of the VNCCS core -------
 
@@ -765,6 +832,7 @@ function applyPayload(payload) {
     extraPrompt = payload.extra_prompt || '';
     $('#extra-prompt').value = extraPrompt;
     if (payload.referencePreview) {
+        personPreviewUrl = payload.referencePreview;
         $('#person-preview').src = payload.referencePreview;
         $('#person-preview-wrap').hidden = false;
     }
@@ -778,6 +846,7 @@ async function start(payload) {
     $('[data-ratio=person]').hidden = !personAspect;
     if (!restored && personAspect) [doc.width, doc.height] = sizeForAspect(personAspect).map(round16);
     void checkEnvironment();
+    if (personPreviewUrl) void dwposeAvailable().then(available => { $('#detect-person').hidden = !available; });
     loadModel(doc.pose);
     setupInteraction();
     ready = true;
@@ -816,7 +885,7 @@ function showError(error) {
 }
 
 if (!embedded) { $('#apply-editor').hidden = true; $('#cancel-editor').hidden = true; }
-window.freePose = { viewer, get doc() { return doc; }, serialize, prompt: promptText, fitFrame, importEntry, addFiles, saveCurrentPose, loadSavedPose, deleteSavedPose, applyCommonPose, galleries };
+window.freePose = { viewer, get doc() { return doc; }, serialize, prompt: promptText, fitFrame, importEntry, addFiles, saveCurrentPose, loadSavedPose, deleteSavedPose, applyCommonPose, galleries, detectPersonPose };
 
 (async () => {
     await viewer.init();

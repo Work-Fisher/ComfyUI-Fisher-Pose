@@ -6,6 +6,7 @@
 <aside class="left-panel fp-left">
 <section><div class="section-heading"><h2>一键摆姿</h2><span><small id="gallery-count"></small> <button class="text-button" id="clear-gallery" hidden>清空</button></span></div>
 <div class="segmented fp-sources" id="gallery-source"><button data-source="common" class="active">常用姿势</button><button data-source="builtin">FISHER小彩蛋</button><button data-source="library">我的图库</button></div>
+<button id="detect-person" class="wide fp-save fp-detect" hidden title="用 DWPose 读取人物图里的姿势，再在 3D 里微调">从人物图识别姿势</button>
 <div class="fp-pick"><label class="fp-button"><input type="file" id="pick-folder" webkitdirectory multiple>选择文件夹</label><label class="fp-button"><input type="file" id="pick-files" accept="image/*" multiple>选择图片</label></div>
 <input id="gallery-filter" class="fp-search" type="search" placeholder="按名称或编号筛选" hidden>
 <div id="gallery" class="fp-gallery"><p class="muted">选 OpenPose 骨架图（黑底彩色），点缩略图即摆好姿势。也可把图片拖到这里。</p></div>
@@ -60,4 +61,4 @@
 <section class="description-section"><div class="section-heading"><h2>提示词</h2><button id="copy-description" class="text-button">复制</button></div><label class="field-label">补充要求（建议英文）<textarea id="extra-prompt" placeholder="例如：keep the outfit, soft studio light"></textarea></label><p id="description"></p><span class="description-note">LoRA 训练指令固定，补充内容另起一行附在后面</span></section>
 </aside></main>
 <footer class="app-footer"><span>Fisher Pose <span class="footer-dot">/</span> Free Pose · mannequin core © MiuProject (MIT)</span><span>人偶图 → image_1，人物图 → image_2</span></footer>
-<script type="module" src="freepose.mjs?v=20260930-2"></script></body></html>
+<script type="module" src="freepose.mjs?v=20260930-3"></script></body></html>
