@@ -49,7 +49,7 @@ class FreePoseTests(unittest.TestCase):
 
     def test_vnccs_order_prompt_and_latent(self):
         args = self.args()
-        positive, negative, latent, prompt, mannequin = FisherQwenFreePose().encode(**args)['result']
+        positive, negative, latent, prompt, mannequin, passed = FisherQwenFreePose().encode(**args)['result']
         self.assertEqual(prompt, 'Draw character from image2')
         calls = args['clip'].calls
         self.assertEqual(calls[0][0], prompt)
@@ -65,7 +65,7 @@ class FreePoseTests(unittest.TestCase):
     def test_output_size_is_independent_of_mannequin_size(self):
         # Mannequin 1024x1024 from the editor, output 16:9 from a resolution selector.
         args = self.args(pose_json=pose_json((1024, 1024), (100, 100, 100)), width=1920, height=1088)
-        positive, negative, latent, prompt, mannequin = FisherQwenFreePose().encode(**args)['result']
+        positive, negative, latent, prompt, mannequin, passed = FisherQwenFreePose().encode(**args)['result']
         self.assertEqual(tuple(mannequin.shape), (1, 1024, 1024, 3))
         encoded = args['clip'].calls[0][1]['images'][0]
         self.assertEqual(encoded.shape[1], encoded.shape[2])  # still square: not padded or stretched to 16:9

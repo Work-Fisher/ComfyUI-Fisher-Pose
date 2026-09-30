@@ -60,3 +60,6 @@
 .fp-people button{position:relative;padding:5px 11px;font-size:11px;border:0;background:transparent}
 .fp-people button.active{background:#263347;color:#fff}
 .fp-people button i{font-style:normal;margin-left:6px;opacity:.6}.fp-people button i:hover{opacity:1;color:#e5484d}
+.fp-switch{display:flex;align-items:center;gap:5px;font-size:11px;color:#5c6d85;cursor:pointer}
+#angle-preview{display:block;max-width:100%;max-height:180px;margin:12px auto 0;border:1px solid var(--line);border-radius:6px;background:#fff}
+#angle-preview:not([src]){display:none}

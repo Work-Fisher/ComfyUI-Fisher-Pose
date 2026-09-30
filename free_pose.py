@@ -62,15 +62,15 @@ class FisherPoseImage:
             "reference_image": ("IMAGE",),
         }}
 
-    RETURN_TYPES = ("IMAGE", "STRING")
-    RETURN_NAMES = ("人偶姿态图", "提示词")
+    RETURN_TYPES = ("IMAGE", "STRING", "STRING")
+    RETURN_NAMES = ("人偶姿态图", "提示词", "姿势数据")
     FUNCTION = "render"
     CATEGORY = "Fisher/姿态与机位"
     DESCRIPTION = "只输出人偶姿态图和提示词，不需要 clip / vae，可以接到任何图像编辑工作流里当姿势参考（例如 Qwen Image 2511）。人偶图接 image1、人物图接 image2（两人时第二个人接 image3），提示词会按人数自动写好。"
 
     def render(self, extra_prompt, pose_json, reference_image=None):
         prompt = free_pose_prompt(extra_prompt, pose_json)
-        return {"ui": {"fisher_prompt": [prompt]}, "result": (mannequin_tensor(pose_json), prompt)}
+        return {"ui": {"fisher_prompt": [prompt]}, "result": (mannequin_tensor(pose_json), prompt, pose_json)}
 
 
 class FisherQwenFreePose:
@@ -88,8 +88,8 @@ class FisherQwenFreePose:
             "reference_image_2": ("IMAGE",),
         }}
 
-    RETURN_TYPES = ("CONDITIONING", "CONDITIONING", "LATENT", "STRING", "IMAGE")
-    RETURN_NAMES = ("正向", "负向", "latent", "实际提示词", "人偶姿态图")
+    RETURN_TYPES = ("CONDITIONING", "CONDITIONING", "LATENT", "STRING", "IMAGE", "STRING")
+    RETURN_NAMES = ("正向", "负向", "latent", "实际提示词", "人偶姿态图", "姿势数据")
     FUNCTION = "encode"
     CATEGORY = "Fisher/姿态与机位"
     DESCRIPTION = "Qwen Image 2.1 自由姿势（1–2 人）。配合 VNCCS_QI2_PoseStudio LoRA：人偶图为 image1、人物图为 image2；编辑器里有两个人时，第二个人的照片接 reference_image_2（image3），提示词自动按左右写好。人偶图尺寸在编辑器里设置；节点 width/height 只决定输出图尺寸，可接分辨率节点，两者无需一致。"
@@ -117,4 +117,4 @@ class FisherQwenFreePose:
         positive, negative, encoded_latent = result.result
         # Output size comes from the node, independent of the mannequin (the encoder would size it from image1).
         latent = {"samples": encoded_latent["samples"].new_zeros((1, 64, height // 16, width // 16))}
-        return {"ui": {"fisher_prompt": [prompt]}, "result": (positive, negative, latent, prompt, mannequin)}
+        return {"ui": {"fisher_prompt": [prompt]}, "result": (positive, negative, latent, prompt, mannequin, pose_json)}

@@ -22,6 +22,7 @@ https://github.com/user-attachments/assets/24dc201a-d9dc-4ac7-86a8-acc9d8f6dd7c
 | 模式 | 节点 | 一句话 |
 |---|---|---|
 | **自由姿势** | `Fisher Qwen2.1 自由姿势` | 1–2 人任意摆姿：真人比例 3D 人偶 + VNCCS PoseStudio LoRA，把参考图里的人物重画成新姿势 |
+| **姿势 + 新机位** | 自由姿势 + `Fisher AnyAngle 机位` | 先按正面摆好姿势出图，再用 TripoSplat 变成 3D、按编辑器里设的机位重绘（AnyAngle LoRA），一次运行出两张 |
 | **通用人偶图** | `Fisher 人偶姿态图（通用）` | 只输出人偶图和提示词，不接 clip / vae，可以当姿势参考接进任何编辑模型的工作流（例如 Qwen Image 2511） |
 | **自由视角** | `Fisher Qwen2.1 人物与姿态编码` | 1–3 人共用机位：转镜头、改站位与动作，中文编辑指令，可接 PE 扩写（[详细说明](docs/自由视角详细说明.md)） |
 
@@ -48,6 +49,22 @@ https://github.com/user-attachments/assets/24dc201a-d9dc-4ac7-86a8-acc9d8f6dd7c
 ![效果展示](docs/images/showcase-v2.jpg)
 
 <sub>示例人物图为 AI 生成。人偶图是 image1，人物图是 image2，提示词固定为 `Draw character from image2`。</sub>
+
+## 新机位（AnyAngle）
+
+导入 `workflows/Fisher-Qwen2.1-自由姿势+机位-AnyAngle.json`，打开编辑器，在「输出」里启用 **新机位 · AnyAngle**：用滑杆调水平角度和俯仰（正数是从上往下看），或者先在视口里转到想要的角度再点「用视口的当前视角」。下面的小图就是新机位下的人偶。应用后运行，工作流先出正面姿势图，再把它重建成 3D、从新机位重绘。
+
+额外需要的模型（约 3.7GB）：
+
+| 文件 | 放到 | 来源 |
+|---|---|---|
+| `QI2.1_AnyAngle.safetensors` | `models/loras` | [lilylilith/QI_2.1_AnyAngle](https://huggingface.co/lilylilith/QI_2.1_AnyAngle) |
+| `triposplat_fp16.safetensors` | `models/diffusion_models` | [VAST-AI/TripoSplat](https://huggingface.co/VAST-AI/TripoSplat) |
+| `triposplat_vae_decoder_fp16.safetensors`、`flux2-vae.safetensors` | `models/vae` | 同上 |
+| `dino_v3_vit_h.safetensors` | `models/clip_vision` | 同上 |
+| `birefnet.safetensors` | `models/background_removal` | [Comfy-Org/BiRefNet](https://huggingface.co/Comfy-Org/BiRefNet) |
+
+几点经验（都实测过）：正面结果接 AnyAngle 编码的 `image1`、粗渲染接 `image2`，CFG 1、25 步；反过来接机位不会变。种子 0 会让这一步过曝发硬，工作流默认种子 42 并每次随机。3D 由单张图重建，背面和被挡住的部分是模型猜的，转得越多越不准。
 
 ## 编辑器
 
@@ -98,6 +115,7 @@ git clone https://github.com/Work-Fisher/ComfyUI-Fisher-Pose.git
 - **[three.js](https://threejs.org/)**：3D 渲染（MIT）。
 - **[ControlNet](https://github.com/lllyasviel/ControlNet)**：OpenPose 骨架的配色与连接顺序参考。
 - **[ComfyUI-qwenmultiangle](https://github.com/jtydhr88/ComfyUI-qwenmultiangle)**：视角分档与镜头词汇参考。
+- **[QI 2.1 AnyAngle](https://huggingface.co/lilylilith/QI_2.1_AnyAngle) · lilylilith**：换机位 LoRA；**[TripoSplat](https://github.com/VAST-AI-Research/TripoSplat) · VAST**：单图生成 3D 高斯溅射；**[AnyAngle Studio · T8](https://github.com/T8mars/Comfyui-Qwen-Image-2.1-MultiAngle-T8)**：AnyAngle 图片顺序与用法的参考。
 - **[ComfyUI](https://github.com/comfyanonymous/ComfyUI)**：插件运行的平台。
 
 ## 常见问题

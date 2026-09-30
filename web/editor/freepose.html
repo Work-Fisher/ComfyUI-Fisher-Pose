@@ -44,6 +44,7 @@
 <label class="slider-label">左右<output id="tx-value"></output></label><input id="tx" type="range" min="-20" max="20" step="0.05">
 <label class="slider-label">上下<output id="ty-value"></output></label><input id="ty" type="range" min="-20" max="20" step="0.05"></section>
 <section><div class="section-heading"><h2>人偶图尺寸</h2><small>仅 image1，与节点输出尺寸无关</small></div><div class="segmented ratios" id="ratios"><button data-ratio="person" title="和人物图同比例，多手多脚更少" hidden>人物图</button><button data-ratio="1:1">1:1</button><button data-ratio="3:4">3:4</button><button data-ratio="4:3">4:3</button><button data-ratio="9:16">9:16</button><button data-ratio="16:9">16:9</button></div><div class="dimensions"><label>宽<input id="output-width" type="number" min="64" max="4096" step="16"></label><label>高<input id="output-height" type="number" min="64" max="4096" step="16"></label></div></section>
+<section id="angle-section"><div class="section-heading"><h2>新机位 · AnyAngle</h2><label class="fp-switch"><input type="checkbox" id="angle-enabled">启用</label></div><p class="muted">姿势照常按正面生成，再用 AnyAngle 把整张图转到这个机位（需要机位工作流）。</p><div id="angle-controls" class="fp-disabled"><label class="slider-label">水平角度<output id="angle-yaw-value"></output></label><input id="angle-yaw" type="range" min="-180" max="180" step="1" value="0"><div class="fp-presets"><button data-angle-yaw="-60">左侧 60°</button><button data-angle-yaw="-30">左 30°</button><button data-angle-yaw="0">正面</button><button data-angle-yaw="30">右 30°</button><button data-angle-yaw="60">右侧 60°</button></div><label class="slider-label">俯仰（正数 = 从上往下看）<output id="angle-pitch-value"></output></label><input id="angle-pitch" type="range" min="-60" max="60" step="1" value="0"><button id="angle-from-view" class="wide">用视口的当前视角</button><img id="angle-preview" alt="新机位预览"></div></section>
 </div>
 <div id="pose-panel" hidden>
 <section><div class="section-heading"><h2>选中关节</h2><span id="bone-name">未选择</span></div>
@@ -61,4 +62,4 @@
 <section class="description-section"><div class="section-heading"><h2>提示词</h2><button id="copy-description" class="text-button">复制</button></div><label class="field-label">补充要求（建议英文）<textarea id="extra-prompt" placeholder="例如：keep the outfit, soft studio light"></textarea></label><p id="description"></p><span class="description-note">LoRA 训练指令固定，补充内容另起一行附在后面</span></section>
 </aside></main>
 <footer class="app-footer"><span>Fisher Pose <span class="footer-dot">/</span> Free Pose · mannequin core © MiuProject (MIT)</span><span>人偶图 → image_1，人物图 → image_2</span></footer>
-<script type="module" src="freepose.mjs?v=20260930-4"></script></body></html>
+<script type="module" src="freepose.mjs?v=20260930-5"></script></body></html>

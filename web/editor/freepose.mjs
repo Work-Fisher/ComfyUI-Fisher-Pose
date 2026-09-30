@@ -48,7 +48,8 @@ async function loadBodyPack() {
     throw new Error('人体数据文件缺失或不完整（web/vnccs/assets/pose_studio_makehuman.v2.bin，约 86MB）。可能被网盘删除或没下载完整，请从 GitHub 重新下载插件：github.com/Work-Fisher/ComfyUI-Fisher-Pose');
 }
 
-let doc = { mesh: { ...DEFAULT_MESH }, proportions: { ...DEFAULT_PROPORTIONS }, pose: null, transform: { ...NEUTRAL_TRANSFORM }, width: 1024, height: 1024, openpose: null };
+const NO_NEW_ANGLE = { enabled: false, yaw: 0, pitch: 0 };
+let doc = { mesh: { ...DEFAULT_MESH }, proportions: { ...DEFAULT_PROPORTIONS }, pose: null, transform: { ...NEUTRAL_TRANSFORM }, width: 1024, height: 1024, openpose: null, anyAngle: { ...NO_NEW_ANGLE } };
 let extraPrompt = '';
 let pack = null;
 let ready = false;
@@ -205,6 +206,12 @@ function schedulePreview() {
         const scale = Math.min(1, 480 / Math.max(doc.width, doc.height));
         const url = capture(Math.round(doc.width * scale), Math.round(doc.height * scale));
         if (url) { $('#capture-preview').src = url; $('#inset-preview').src = url; }
+        if (doc.anyAngle.enabled) {
+            viewer.updateLights(CAPTURE_LIGHTS);
+            // The core's capture pitch is positive looking up; the UI's is positive looking down.
+            $('#angle-preview').src = viewer.capture(Math.round(doc.width * scale), Math.round(doc.height * scale), 1, CAPTURE_BACKGROUND, 0, 0, doc.anyAngle.yaw, -doc.anyAngle.pitch);
+            updateCamera(false);
+        }
     }, 300);
 }
 
@@ -585,6 +592,7 @@ async function loadSavedPose(entry) {
         loadModel(doc.pose);
         setGrips(record.doc.people?.[0]?.grips || record.grips);
         rebuildPassives();
+        refreshAngle();
         updateCamera(true);
         refreshFlips();
         activeSavedName = entry.name;
@@ -702,31 +710,85 @@ function removePerson() {
     $('#import-status').textContent = '已删除人物 2。';
 }
 
+// Everybody's skinned vertices (sampled): world bounding box and extent in the capture camera's NDC.
+function measurePeople() {
+    const THREE = viewer.THREE;
+    const camera = viewer.captureCamera, v = new THREE.Vector3(), box = new THREE.Box3(), ndc = new THREE.Box2();
+    const meshes = [viewer.skinnedMesh, ...[...viewer.passiveCharacters.values()].map(entry => entry.mesh)].filter(Boolean);
+    for (const mesh of meshes) {
+        mesh.updateMatrixWorld(true);
+        const count = mesh.geometry.attributes.position.count;
+        for (let i = 0; i < count; i += 23) {
+            mesh.getVertexPosition(i, v).applyMatrix4(mesh.matrixWorld);
+            box.expandByPoint(v);
+            const p = v.clone().project(camera);
+            ndc.expandByPoint(new THREE.Vector2(p.x, p.y));
+        }
+    }
+    return { box, ndc };
+}
+
+// --- New camera angle (AnyAngle) ---------------------------------------------
+// The pose is still generated from the front; the workflow then turns the result into a 3D splat
+// (TripoSplat), renders it from this camera and lets the QI2.1 AnyAngle LoRA redraw it. The camera is
+// stored relative to the people, in units of their height, so fisher_anyangle.py can place it on
+// the splat whatever its scale.
+function anyAngleCamera() {
+    const THREE = viewer.THREE;
+    viewer.updateCaptureCamera(doc.width, doc.height, 1, 0, 0, doc.anyAngle.yaw, -doc.anyAngle.pitch);
+    const camera = viewer.captureCamera;
+    camera.updateMatrixWorld(true);
+    const { box } = measurePeople();
+    const center = box.getCenter(new THREE.Vector3());
+    const height = Math.max(box.max.y - box.min.y, 1e-3);
+    const result = {
+        position: camera.position.clone().sub(center).divideScalar(height).toArray(),
+        forward: camera.getWorldDirection(new THREE.Vector3()).toArray(),
+        fov: camera.fov, aspect: doc.width / doc.height,
+    };
+    updateCamera(false);
+    return result;
+}
+
+function refreshAngle() {
+    const angle = doc.anyAngle;
+    $('#angle-enabled').checked = angle.enabled;
+    $('#angle-controls').classList.toggle('fp-disabled', !angle.enabled);
+    $('#angle-yaw').value = angle.yaw; setOutput('angle-yaw', `${Math.round(angle.yaw)}°`);
+    $('#angle-pitch').value = angle.pitch; setOutput('angle-pitch', `${Math.round(angle.pitch)}°`);
+    if (!angle.enabled) $('#angle-preview').removeAttribute('src');
+}
+
+function setAngle(values) {
+    doc.anyAngle = { ...doc.anyAngle, ...values };
+    refreshAngle();
+    schedulePreview();
+}
+
+$('#angle-enabled').onchange = event => setAngle({ enabled: event.target.checked });
+$('#angle-yaw').oninput = event => setAngle({ yaw: Number(event.target.value) });
+$('#angle-pitch').oninput = event => setAngle({ pitch: Number(event.target.value) });
+for (const button of document.querySelectorAll('[data-angle-yaw]')) button.onclick = () => setAngle({ enabled: true, yaw: Number(button.dataset.angleYaw) });
+// Take the angle the viewport is looking from (around the capture pivot), keep the capture distance.
+$('#angle-from-view').onclick = () => {
+    const THREE = viewer.THREE;
+    const pivot = viewer.sceneCameraTarget || viewer.orbit.target;
+    const d = viewer.camera.position.clone().sub(pivot);
+    const yaw = THREE.MathUtils.radToDeg(Math.atan2(d.x, d.z));
+    const pitch = THREE.MathUtils.radToDeg(Math.atan2(d.y, Math.hypot(d.x, d.z)));
+    setAngle({ enabled: true, yaw: Math.round(yaw), pitch: Math.round(clamp(pitch, -60, 60)) });
+};
+
 // 撑满 for two: scale and centre the whole group in the capture frame, keeping who stands where.
 function frameEveryone(snap = false) {
     if (!doc.people) { fitFrame(snap); return; }
     const THREE = viewer.THREE;
     doc.people[doc.active] = snapshotActive();
-    const meshes = () => [viewer.skinnedMesh, ...[...viewer.passiveCharacters.values()].map(entry => entry.mesh)].filter(Boolean);
     const apply = () => doc.people.forEach((person, index) => {
         if (index === doc.active) { doc.transform = { ...person.transform }; viewer.setActiveCharacterAppearance({ transform: doc.transform }); }
         else viewer.setPassiveCharacterState(passiveId(index), { pose: person.pose, transform: person.transform, color: PERSON_COLOR });
     });
-    const measure = () => {
-        updateCamera(false);
-        const camera = viewer.captureCamera, v = new THREE.Vector3(), box = new THREE.Box3(), ndc = new THREE.Box2();
-        for (const mesh of meshes()) {
-            mesh.updateMatrixWorld(true);
-            const count = mesh.geometry.attributes.position.count;
-            for (let i = 0; i < count; i += 23) {
-                mesh.getVertexPosition(i, v).applyMatrix4(mesh.matrixWorld);
-                box.expandByPoint(v);
-                const p = v.clone().project(camera);
-                ndc.expandByPoint(new THREE.Vector2(p.x, p.y));
-            }
-        }
-        return { box, ndc };
-    };
+    const measure = () => { updateCamera(false); return measurePeople(); };
     for (let pass = 0; pass < 3; pass++) {
         const { box, ndc } = measure();
         const size = ndc.getSize(new THREE.Vector2());
@@ -1008,7 +1070,8 @@ async function serialize() {
     updateCamera(false);
     doc.pose = savedPose();
     const people = doc.people ? peopleNow() : undefined;
-    return JSON.stringify({ version: 2, kind: 'vnccs-free-pose', ...doc, people, active: undefined, camera: FRONT, poseReference });
+    const anyAngle = doc.anyAngle.enabled ? { ...doc.anyAngle, camera: anyAngleCamera() } : { ...doc.anyAngle };
+    return JSON.stringify({ version: 2, kind: 'vnccs-free-pose', ...doc, people, active: undefined, anyAngle, camera: FRONT, poseReference });
 }
 
 function personFrom(saved) {
@@ -1031,6 +1094,7 @@ function docFrom(saved) {
         ...first, people, active: 0,
         // The mannequin size lives only here; the node's width/height are the separate output size.
         width: round16(Number(saved.width) || doc.width), height: round16(Number(saved.height) || doc.height),
+        anyAngle: { ...NO_NEW_ANGLE, ...saved.anyAngle, camera: undefined },
     };
 }
 
@@ -1064,6 +1128,7 @@ async function start(payload) {
     else fitFrame(true);
     refreshFlips();
     refreshPeople();
+    refreshAngle();
     void loadBuiltin();
     void loadLibrary();
     void loadSavedList();
