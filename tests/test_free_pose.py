@@ -86,6 +86,35 @@ class FreePoseTests(unittest.TestCase):
             self.assertEqual(args['clip'].calls, [])
 
 
+def two_people(xs=(-4.0, 5.0)):
+    data = json.loads(pose_json((768, 512)))
+    data['people'] = [{'transform': {'x': x, 'y': 0, 'z': 0, 'zoom': 1}} for x in xs]
+    return json.dumps(data)
+
+
+class TwoPeopleTests(unittest.TestCase):
+    args = FreePoseTests.args
+
+    def test_second_person_is_image3_and_named_by_side(self):
+        args = self.args(pose_json=two_people(), reference_image_2=torch.full((1, 64, 48, 3), .6))
+        prompt = FisherQwenFreePose().encode(**args)['result'][3]
+        self.assertEqual(prompt, 'Draw the left character from image2 in the pose of the left mannequin in image1, '
+                                 'and the right character from image3 in the pose of the right mannequin in image1.')
+        images = args['clip'].calls[0][1]['images']
+        self.assertEqual(len(images), 3)
+        self.assertAlmostEqual(float(images[2].mean()), .6, delta=1 / 255)  # person 2 is image3
+
+    def test_sides_follow_where_people_stand(self):
+        self.assertTrue(free_pose_prompt('', two_people((6.0, -3.0))).startswith('Draw the right character from image2'))
+
+    def test_wiring_mismatches_are_explained(self):
+        for args, message in [(self.args(pose_json=two_people()), 'reference_image_2'),
+                              (self.args(reference_image_2=torch.zeros(1, 64, 48, 3)), '只有 1 个人')]:
+            with self.subTest(message), self.assertRaisesRegex(ValueError, message):
+                FisherQwenFreePose().encode(**args)
+            self.assertEqual(args['clip'].calls, [])
+
+
 class OpenPoseLibraryTests(unittest.TestCase):
     def test_list_and_clear_only_touch_library_images(self):
         import tempfile

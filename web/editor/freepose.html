@@ -28,7 +28,7 @@
 <label class="slider-label">右手握紧<output id="grip-r-value"></output></label><input id="grip-r" data-hand="r" type="range" min="0" max="1" step="0.01" value="0"></section>
 </aside>
 <div class="workspace"><div class="stage fp-stage" id="stage"><canvas id="viewport-canvas" tabindex="0"></canvas>
-<div class="stage-top"><div class="stage-label"><i></i>橙框 = 正面输出画面</div><button id="snap-view" class="fp-chip">⊙ 回到正面视角</button></div>
+<div class="stage-top"><div class="stage-label"><i></i>橙框 = 正面输出画面</div><div class="fp-people" id="people" title="人物 1 用 image2，人物 2 用 image3。点画面里的另一个人偶也能切换"><button data-person="0" class="active">人物 1</button><button data-person="1" hidden>人物 2<i id="remove-person" title="删除人物 2">×</i></button><button id="add-person">＋ 第二个人</button></div><button id="snap-view" class="fp-chip">⊙ 回到正面视角</button></div>
 <figure class="fp-inset"><img id="inset-preview" alt="正面输出预览"><figcaption>正面输出</figcaption></figure>
 <div class="stage-bottom"><span id="selection-hint">拖空白处转视角 · 拖关节摆姿 · Shift+拖 移动人物</span><button id="fit-frame">⤢ 人物撑满画框</button></div>
 <div id="env-banner" class="fp-banner" role="alert" hidden></div>
@@ -61,4 +61,4 @@
 <section class="description-section"><div class="section-heading"><h2>提示词</h2><button id="copy-description" class="text-button">复制</button></div><label class="field-label">补充要求（建议英文）<textarea id="extra-prompt" placeholder="例如：keep the outfit, soft studio light"></textarea></label><p id="description"></p><span class="description-note">LoRA 训练指令固定，补充内容另起一行附在后面</span></section>
 </aside></main>
 <footer class="app-footer"><span>Fisher Pose <span class="footer-dot">/</span> Free Pose · mannequin core © MiuProject (MIT)</span><span>人偶图 → image_1，人物图 → image_2</span></footer>
-<script type="module" src="freepose.mjs?v=20260930-3"></script></body></html>
+<script type="module" src="freepose.mjs?v=20260930-4"></script></body></html>

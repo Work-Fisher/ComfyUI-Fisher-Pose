@@ -4,6 +4,8 @@ The VNCCS_QI2_PoseStudio LoRA was trained with the mannequin render as image1,
 the character photo as image2 and the fixed instruction below, so this node
 keeps exactly that order and wording instead of our long Chinese edit prompt.
 """
+import json
+
 import numpy as np
 import torch
 
@@ -13,8 +15,32 @@ from .pose_reference import reference_image
 VNCCS_INSTRUCTION = "Draw character from image2"
 
 
-def free_pose_prompt(extra=""):
-    lines = [VNCCS_INSTRUCTION] + [line.strip() for line in str(extra or "").splitlines()]
+def people_sides(pose_json):
+    """For a two-person editor state: ('left'|'right') of person 1 and person 2 in the capture, else None."""
+    try:
+        people = json.loads(pose_json or "{}").get("people")
+    except (ValueError, AttributeError):
+        return None
+    if not isinstance(people, list) or len(people) < 2:
+        return None
+    xs = [float((person.get("transform") or {}).get("x", 0)) for person in people[:2]]
+    return ("left", "right") if xs[0] <= xs[1] else ("right", "left")
+
+
+def instruction(pose_json=None):
+    # The LoRA was trained on one person. With two, naming each mannequin by its side and asking for its
+    # pose is what made both people follow their poses in testing (2026-09-30); a bare
+    # "character from image2 and character from image3" kept both people standing.
+    sides = people_sides(pose_json)
+    if not sides:
+        return VNCCS_INSTRUCTION
+    first, second = sides
+    return (f"Draw the {first} character from image2 in the pose of the {first} mannequin in image1, "
+            f"and the {second} character from image3 in the pose of the {second} mannequin in image1.")
+
+
+def free_pose_prompt(extra="", pose_json=None):
+    lines = [instruction(pose_json)] + [line.strip() for line in str(extra or "").splitlines()]
     return "\n".join(line for line in lines if line)
 
 
@@ -40,11 +66,11 @@ class FisherPoseImage:
     RETURN_NAMES = ("人偶姿态图", "提示词")
     FUNCTION = "render"
     CATEGORY = "Fisher/姿态与机位"
-    DESCRIPTION = "只输出人偶姿态图和提示词，不需要 clip / vae，可以接到任何图像编辑工作流里当姿势参考（例如 Qwen Image 2511）。人偶图接 image1、人物图接 image2 时，提示词用 Draw character from image2。"
+    DESCRIPTION = "只输出人偶姿态图和提示词，不需要 clip / vae，可以接到任何图像编辑工作流里当姿势参考（例如 Qwen Image 2511）。人偶图接 image1、人物图接 image2（两人时第二个人接 image3），提示词会按人数自动写好。"
 
     def render(self, extra_prompt, pose_json, reference_image=None):
-        return {"ui": {"fisher_prompt": [free_pose_prompt(extra_prompt)]},
-                "result": (mannequin_tensor(pose_json), free_pose_prompt(extra_prompt))}
+        prompt = free_pose_prompt(extra_prompt, pose_json)
+        return {"ui": {"fisher_prompt": [prompt]}, "result": (mannequin_tensor(pose_json), prompt)}
 
 
 class FisherQwenFreePose:
@@ -57,25 +83,37 @@ class FisherQwenFreePose:
             "reference_resolution": ("INT", {"default": 1024, "min": 256, "max": 2048, "step": 32}),
             "extra_prompt": ("STRING", {"default": "", "multiline": True}),
             "pose_json": ("STRING", {"default": "{}", "multiline": True}),
+        }, "optional": {
+            # Person 2's photo (image3) when the editor has two people.
+            "reference_image_2": ("IMAGE",),
         }}
 
     RETURN_TYPES = ("CONDITIONING", "CONDITIONING", "LATENT", "STRING", "IMAGE")
     RETURN_NAMES = ("正向", "负向", "latent", "实际提示词", "人偶姿态图")
     FUNCTION = "encode"
     CATEGORY = "Fisher/姿态与机位"
-    DESCRIPTION = "Qwen Image 2.1 自由姿势（单人）。配合 VNCCS_QI2_PoseStudio LoRA：人偶图为 image1、人物图为 image2，提示词固定 Draw character from image2。人偶图尺寸在编辑器里设置；节点 width/height 只决定输出图尺寸，可接分辨率节点，两者无需一致。"
+    DESCRIPTION = "Qwen Image 2.1 自由姿势（1–2 人）。配合 VNCCS_QI2_PoseStudio LoRA：人偶图为 image1、人物图为 image2；编辑器里有两个人时，第二个人的照片接 reference_image_2（image3），提示词自动按左右写好。人偶图尺寸在编辑器里设置；节点 width/height 只决定输出图尺寸，可接分辨率节点，两者无需一致。"
 
-    def encode(self, clip, vae, reference_image, width, height, reference_resolution, extra_prompt, pose_json):
+    def encode(self, clip, vae, reference_image, width, height, reference_resolution, extra_prompt, pose_json, reference_image_2=None):
         if width % 16 or height % 16:
             raise ValueError("Qwen 输出宽高须为16的倍数，请调整节点的 width/height。")
-        if reference_image.ndim != 4 or reference_image.shape[0] != 1:
-            raise ValueError("自由姿势只支持单张人物图，请不要接入图片批次。")
+        for image in (reference_image, reference_image_2):
+            if image is not None and (image.ndim != 4 or image.shape[0] != 1):
+                raise ValueError("每个人物图口只接一张图，请不要接入图片批次。")
+        two = people_sides(pose_json) is not None
+        if two and reference_image_2 is None:
+            raise ValueError("编辑器里有 2 个人：请把人物 2 的照片接到 reference_image_2（对应 image3）。")
+        if reference_image_2 is not None and not two:
+            raise ValueError("接了 reference_image_2，但编辑器里只有 1 个人：请在编辑器里点「＋ 第二个人」，或断开 reference_image_2。")
         require_qwen21()
         mannequin = mannequin_tensor(pose_json)
-        prompt = free_pose_prompt(extra_prompt)
+        prompt = free_pose_prompt(extra_prompt, pose_json)
+        images = {"image_1": mannequin, "image_2": reference_image}
+        if two:
+            images["image_3"] = reference_image_2
         from comfy_extras.nodes_qwen import TextEncodeQwenImage21
         result = TextEncodeQwenImage21.execute(clip=clip, prompt=prompt, negative_prompt="", vae=vae,
-                    resolution=reference_resolution, images={"image_1": mannequin, "image_2": reference_image})
+                    resolution=reference_resolution, images=images)
         positive, negative, encoded_latent = result.result
         # Output size comes from the node, independent of the mannequin (the encoder would size it from image1).
         latent = {"samples": encoded_latent["samples"].new_zeros((1, 64, height // 16, width // 16))}

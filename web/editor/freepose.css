@@ -56,3 +56,7 @@
 .fp-thumb.fp-mannequin.active{border-color:#6e8cff}
 .fp-thumb.fp-mannequin span{color:#fff;background:#1a1f2ecc;font-size:9px;padding:2px 4px}
 .fp-detect{margin:0 0 10px}
+.fp-people{pointer-events:auto;display:flex;gap:4px;background:#ffffffc8;border-radius:8px;padding:3px}
+.fp-people button{position:relative;padding:5px 11px;font-size:11px;border:0;background:transparent}
+.fp-people button.active{background:#263347;color:#fff}
+.fp-people button i{font-style:normal;margin-left:6px;opacity:.6}.fp-people button i:hover{opacity:1;color:#e5484d}

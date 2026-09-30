@@ -21,12 +21,13 @@ https://github.com/user-attachments/assets/24dc201a-d9dc-4ac7-86a8-acc9d8f6dd7c
 
 | 模式 | 节点 | 一句话 |
 |---|---|---|
-| **自由姿势** | `Fisher Qwen2.1 自由姿势` | 单人任意摆姿：真人比例 3D 人偶 + VNCCS PoseStudio LoRA，把参考图里的人物重画成新姿势 |
+| **自由姿势** | `Fisher Qwen2.1 自由姿势` | 1–2 人任意摆姿：真人比例 3D 人偶 + VNCCS PoseStudio LoRA，把参考图里的人物重画成新姿势 |
 | **通用人偶图** | `Fisher 人偶姿态图（通用）` | 只输出人偶图和提示词，不接 clip / vae，可以当姿势参考接进任何编辑模型的工作流（例如 Qwen Image 2511） |
 | **自由视角** | `Fisher Qwen2.1 人物与姿态编码` | 1–3 人共用机位：转镜头、改站位与动作，中文编辑指令，可接 PE 扩写（[详细说明](docs/自由视角详细说明.md)） |
 
 ### 自由姿势亮点
 
+- **最多两个人**：编辑器上方点「＋ 第二个人」，两个人各自摆姿势、调位置、改体型；点画面里的人偶就能切换编辑对象。第二个人的照片接节点的 `reference_image_2`（image3），提示词会按两人在画面里的左右自动写好。
 - **真人比例人偶**：采用 [VNCCS Pose Studio](https://github.com/AHEKOT/ComfyUI_VNCCS_Utils) 的 MakeHuman 人偶，和 LoRA 训练时用的人偶一致，模型认得出。
 - **从人物图识别姿势**：在编辑器里点一下，用 DWPose 读出人物图里的姿势，人偶直接摆好，再在 3D 里微调。需要装 [comfyui_controlnet_aux](https://github.com/Fannovel16/comfyui_controlnet_aux)，没装时按钮不出现。
 - **OpenPose 一键摆姿**：点一张彩色骨架图就能摆好。2D 骨架没有前后信息，插件按骨长缩短量推算深度；估错时，躯干和四肢各段都能一键在前后之间翻转。
@@ -117,7 +118,7 @@ git clone https://github.com/Work-Fisher/ComfyUI-Fisher-Pose.git
 
 ## 已知限制
 
-- 自由姿势目前只支持单人。OpenPose 图里有多人时，只取身形最大的那个人。
+- 自由姿势最多两个人。VNCCS LoRA 是用单人数据训练的，两人时姿势跟随度不如单人稳定，动作幅度大的姿势（举手、指向、伸臂）比细微动作（叉腰）更容易还原。OpenPose 图里有多人时，只取身形最大的那个人。
 - 2D 骨架无法唯一确定前后深度，复杂姿势需要手动翻转或微调。头部朝向、手指、脚掌不会从骨架读取。
 - 人偶图只提供姿势。输出比例和人偶图差别很大时，人物在画面里的位置由模型决定。
 

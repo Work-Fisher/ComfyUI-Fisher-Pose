@@ -56,11 +56,18 @@ let selectedBoneName = null;
 let previewTimer = null;
 let morphTimer = null;
 let personAspect = null; // width / height of the connected person photo, when known
-let personPreviewUrl = null;
+let personPreviewUrls = [null, null]; // person photos wired to image2 / image3, when the node has them
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 const round16 = value => clamp(Math.round(value / 16) * 16, 64, 4096);
-const promptText = () => [INSTRUCTION, ...extraPrompt.split('\n').map(line => line.trim())].filter(Boolean).join('\n');
+// Mirrors free_pose.py instruction(): two people are named by the side they stand on.
+function instructionText() {
+    if (!doc.people) return INSTRUCTION;
+    const xs = doc.people.map((person, index) => (index === doc.active ? doc.transform : person.transform).x);
+    const [first, second] = xs[0] <= xs[1] ? ['left', 'right'] : ['right', 'left'];
+    return `Draw the ${first} character from image2 in the pose of the ${first} mannequin in image1, and the ${second} character from image3 in the pose of the ${second} mannequin in image1.`;
+}
+const promptText = () => [instructionText(), ...extraPrompt.split('\n').map(line => line.trim())].filter(Boolean).join('\n');
 
 function toast(text) {
     const element = $('#toast');
@@ -216,6 +223,7 @@ function restJoints() {
 // `build(rest, head)` returns relative to the hip midpoint (as {kps, ...extra}); returns extra.
 function importKeypoints(build) {
     viewer.recordState();
+    const keep = doc.people ? { ...doc.transform } : null; // with two people, a new pose must not move anyone
     doc.transform = { ...NEUTRAL_TRANSFORM };
     viewer.setActiveCharacterAppearance({ transform: doc.transform });
     resetPose();
@@ -226,8 +234,12 @@ function importKeypoints(build) {
     const worldKps = Object.fromEntries(Object.entries(WORLD_KEYPOINT_NAMES).map(([key, name]) => [name, new THREE.Vector3(...kps[key].map((v, i) => v + pelvis[i]))]));
     // Hip sockets, head, hands and feet have no reliable source; keep the mannequin's own.
     viewer.applyWorldKeypointImport(worldKps, { drawFigure: false, placeHipRoots: false, alignHead: false, alignHands: false, alignFeet: false, dispatchPoseChange: false });
+    if (keep) { doc.transform = keep; viewer.setActiveCharacterAppearance({ transform: keep }); }
     return extra;
 }
+
+// After a new pose: one person is re-framed; two people keep their layout.
+const refit = snap => (doc.people ? updateCamera(snap) : fitFrame(snap));
 
 function applyOpenPose() {
     const { points, flips } = doc.openpose;
@@ -240,7 +252,7 @@ function applyOpenPose() {
         lifted.kps.head = lifted.kps.neck.map((v, i) => v + direction[i] / norm * headDistance);
         return lifted;
     });
-    fitFrame(true);
+    refit(true);
     refreshFlips(facingAway);
     return facingAway;
 }
@@ -251,7 +263,7 @@ function applyCommonPose(entry) {
     if (entry.spec.turn) viewer.setModelRotation(0, entry.spec.turn, 0);
     doc.openpose = null;
     refreshFlips();
-    fitFrame(true);
+    refit(true);
     for (const button of document.querySelectorAll('.fp-thumb')) button.classList.toggle('active', button.dataset.key === entry.key);
     $('#import-status').textContent = `已摆成「${entry.name}」。可以再拖关节微调。`;
 }
@@ -291,7 +303,7 @@ async function detectPersonPose() {
     button.disabled = true;
     try {
         status.textContent = '正在上传人物图…';
-        const blob = await (await fetch(personPreviewUrl)).blob();
+        const blob = await (await fetch(personPreviewUrls[doc.active])).blob();
         const form = new FormData();
         // Named by content, so detecting the same photo again reuses one copy in input/fisher_pose.
         const bytes = new Uint8Array(await blob.arrayBuffer());
@@ -546,8 +558,8 @@ async function saveCurrentPose(presetName) {
     updateCamera(false);
     const record = {
         version: 1, thumbnail,
-        doc: { ...doc, pose: savedPose() },
-        grips: { l: Number($('#grip-l').value), r: Number($('#grip-r').value) },
+        doc: { ...doc, pose: savedPose(), people: doc.people ? peopleNow() : undefined, active: undefined },
+        grips: gripsNow(),
     };
     try {
         let response = await postPose(name, record, false);
@@ -571,7 +583,8 @@ async function loadSavedPose(entry) {
         viewer.recordState();
         doc = docFrom(record.doc);
         loadModel(doc.pose);
-        for (const side of ['l', 'r']) $(`#grip-${side}`).value = record.grips?.[side] ?? 0;
+        setGrips(record.doc.people?.[0]?.grips || record.grips);
+        rebuildPassives();
         updateCamera(true);
         refreshFlips();
         activeSavedName = entry.name;
@@ -593,6 +606,184 @@ async function deleteSavedPose(entry, skipConfirm = false) {
 
 $('#save-pose').onclick = () => saveCurrentPose();
 $('#detect-person').onclick = detectPersonPose;
+
+// --- Two people -------------------------------------------------------------
+// The VNCCS core edits one rig; everybody else is a passive clone that still renders in the capture.
+// Switching snapshots the edited person into a clone and loads the other one as the editable rig.
+
+const MAX_PEOPLE = 2;
+const PERSON_COLOR = '#ffffff';
+const passiveId = index => `person-${index}`;
+let dwposeReady = false;
+
+const gripsNow = () => ({ l: Number($('#grip-l').value), r: Number($('#grip-r').value) });
+function setGrips(grips) { for (const side of ['l', 'r']) $(`#grip-${side}`).value = grips?.[side] ?? 0; }
+
+function snapshotActive() {
+    return { mesh: { ...doc.mesh }, proportions: { ...doc.proportions }, pose: savedPose(), transform: { ...doc.transform }, openpose: doc.openpose, grips: gripsNow() };
+}
+
+function peopleNow() {
+    const people = doc.people.slice();
+    people[doc.active] = snapshotActive();
+    return people;
+}
+
+// Load person `index` of doc.people as the editable rig (the caller handles its old clone).
+function loadPerson(index) {
+    const person = doc.people[index];
+    doc.active = index;
+    Object.assign(doc, { mesh: { ...person.mesh }, proportions: { ...person.proportions }, pose: person.pose, transform: { ...person.transform }, openpose: person.openpose });
+    loadModel(person.pose);
+    setGrips(person.grips);
+}
+
+// Clones for everyone but the edited person, built from their own body shape and pose.
+function rebuildPassives() {
+    viewer.clearPassiveCharacters();
+    if (!doc.people) return;
+    const active = doc.active;
+    doc.people[active] = snapshotActive();
+    doc.people.forEach((person, index) => {
+        if (index === active) return;
+        loadPerson(index);
+        viewer.upsertPassiveCharacterFromActive(passiveId(index), { pose: person.pose, transform: person.transform, color: PERSON_COLOR });
+    });
+    loadPerson(active);
+}
+
+function forgetHistory() {
+    // The core keeps one undo stack for "the" rig; replaying it on another person would pose the wrong body.
+    viewer.history = [];
+    viewer.future = [];
+}
+
+function switchPerson(index) {
+    if (!doc.people || index === doc.active || !doc.people[index]) return;
+    doc.people[doc.active] = snapshotActive();
+    const left = doc.people[doc.active];
+    viewer.upsertPassiveCharacterFromActive(passiveId(doc.active), { pose: left.pose, transform: left.transform, color: PERSON_COLOR });
+    viewer.removePassiveCharacter(passiveId(index));
+    loadPerson(index);
+    forgetHistory();
+    selectedBoneName = null;
+    refreshPeople(); refreshFlips(); refreshControls(); updateCamera(false);
+    $('#import-status').textContent = `正在编辑人物 ${index + 1}（对应 image${index + 2}）。`;
+}
+
+function addPerson() {
+    if (doc.people) return;
+    const first = snapshotActive();
+    // Room for two: side by side at the current size, on a landscape frame.
+    const shift = 4.4 * first.transform.zoom;
+    first.transform = { ...first.transform, x: first.transform.x - shift };
+    doc.people = [first, { mesh: { ...DEFAULT_MESH }, proportions: { ...DEFAULT_PROPORTIONS }, pose: null, transform: { ...doc.transform, x: doc.transform.x + shift }, openpose: null, grips: { l: 0, r: 0 } }];
+    doc.active = 0;
+    doc.transform = { ...first.transform };
+    viewer.setActiveCharacterAppearance({ transform: doc.transform });
+    viewer.upsertPassiveCharacterFromActive(passiveId(0), { pose: first.pose, transform: first.transform, color: PERSON_COLOR });
+    loadPerson(1);
+    forgetHistory();
+    if (doc.width / doc.height < 1.2) { setSize(...sizeForAspect(4 / 3)); toast('两个人时人偶图改成了 4:3 横图，可在「人偶图尺寸」里改'); }
+    frameEveryone();
+    refreshPeople(); refreshControls();
+    $('#import-status').textContent = '已添加人物 2（对应 image3）。给它选一个姿势，或点画面里的人偶切换编辑对象。';
+}
+
+function removePerson() {
+    if (!doc.people) return;
+    if (doc.active !== 0) switchPerson(0);
+    doc.people = null;
+    doc.active = 0;
+    viewer.clearPassiveCharacters();
+    forgetHistory();
+    fitFrame(false);
+    refreshPeople();
+    $('#import-status').textContent = '已删除人物 2。';
+}
+
+// 撑满 for two: scale and centre the whole group in the capture frame, keeping who stands where.
+function frameEveryone(snap = false) {
+    if (!doc.people) { fitFrame(snap); return; }
+    const THREE = viewer.THREE;
+    doc.people[doc.active] = snapshotActive();
+    const meshes = () => [viewer.skinnedMesh, ...[...viewer.passiveCharacters.values()].map(entry => entry.mesh)].filter(Boolean);
+    const apply = () => doc.people.forEach((person, index) => {
+        if (index === doc.active) { doc.transform = { ...person.transform }; viewer.setActiveCharacterAppearance({ transform: doc.transform }); }
+        else viewer.setPassiveCharacterState(passiveId(index), { pose: person.pose, transform: person.transform, color: PERSON_COLOR });
+    });
+    const measure = () => {
+        updateCamera(false);
+        const camera = viewer.captureCamera, v = new THREE.Vector3(), box = new THREE.Box3(), ndc = new THREE.Box2();
+        for (const mesh of meshes()) {
+            mesh.updateMatrixWorld(true);
+            const count = mesh.geometry.attributes.position.count;
+            for (let i = 0; i < count; i += 23) {
+                mesh.getVertexPosition(i, v).applyMatrix4(mesh.matrixWorld);
+                box.expandByPoint(v);
+                const p = v.clone().project(camera);
+                ndc.expandByPoint(new THREE.Vector2(p.x, p.y));
+            }
+        }
+        return { box, ndc };
+    };
+    for (let pass = 0; pass < 3; pass++) {
+        const { box, ndc } = measure();
+        const size = ndc.getSize(new THREE.Vector2());
+        const s = pass === 2 ? 1 : Math.min(1.68 / Math.max(size.x, 1e-3), 1.68 / Math.max(size.y, 1e-3));
+        const center = box.getCenter(new THREE.Vector3());
+        const projected = center.clone().project(viewer.captureCamera);
+        const mid = ndc.getCenter(new THREE.Vector2());
+        const target = new THREE.Vector3(projected.x - mid.x, projected.y - mid.y, projected.z).unproject(viewer.captureCamera);
+        const delta = target.sub(center);
+        for (const person of doc.people) {
+            const t = person.transform;
+            person.transform = {
+                x: clamp(center.x + (t.x - center.x) * s + delta.x, -50, 50),
+                y: clamp(center.y + (t.y - center.y) * s + delta.y, -50, 50),
+                z: clamp(center.z + (t.z - center.z) * s, -40, 40),
+                zoom: t.zoom * s,
+            };
+        }
+        apply();
+    }
+    updateCamera(snap);
+}
+
+function refreshPeople() {
+    const two = Boolean(doc.people);
+    for (const button of document.querySelectorAll('[data-person]')) {
+        const index = Number(button.dataset.person);
+        button.hidden = index >= (two ? MAX_PEOPLE : 1) || (!two && index > 0);
+        button.classList.toggle('active', index === doc.active);
+    }
+    $('#people [data-person="0"]').hidden = !two;
+    $('#add-person').hidden = two;
+    $('#detect-person').hidden = !(dwposeReady && personPreviewUrls[doc.active]);
+    $('#detect-person').textContent = two ? `从人物图识别姿势（人物 ${doc.active + 1}）` : '从人物图识别姿势';
+}
+
+for (const button of document.querySelectorAll('[data-person]')) {
+    button.onclick = event => (event.target.closest('#remove-person') ? removePerson() : switchPerson(Number(button.dataset.person)));
+}
+$('#add-person').onclick = addPerson;
+
+// Clicking the other mannequin (a click, not an orbit drag, and not on a joint) edits that person.
+function pickPassive(event) {
+    if (!doc.people) return;
+    const THREE = viewer.THREE;
+    const rect = canvas.getBoundingClientRect();
+    const pointer = new THREE.Vector2(((event.clientX - rect.left) / rect.width) * 2 - 1, -((event.clientY - rect.top) / rect.height) * 2 + 1);
+    const raycaster = new THREE.Raycaster();
+    raycaster.setFromCamera(pointer, viewer.camera);
+    let best = null;
+    for (const [key, entry] of viewer.passiveCharacters) {
+        const hit = raycaster.intersectObject(entry.mesh, false)[0];
+        if (hit && (!best || hit.distance < best.distance)) best = { distance: hit.distance, index: Number(key.split('-')[1]) };
+    }
+    const own = raycaster.intersectObject(viewer.skinnedMesh, false)[0];
+    if (best && (!own || best.distance < own.distance)) switchPerson(best.index);
+}
 
 // --- Viewport interaction: our editor's feel on top of the VNCCS core -------
 
@@ -625,10 +816,16 @@ function setupInteraction() {
     // Runs after the core's own handler: if it grabbed a joint, the drag must not also orbit.
     canvas.addEventListener('pointerdown', event => {
         if (event.button !== 0) return;
-        if (viewer.directDrag?.active || viewer.selectedBone || viewer.selectedIKEffector || viewer.selectedPoleTarget || viewer.transform?.dragging) {
+        const grabbed = viewer.directDrag?.active || viewer.selectedIKEffector || viewer.selectedPoleTarget || viewer.transform?.dragging;
+        if (grabbed || viewer.selectedBone) {
             viewer.orbit.enabled = false;
             window.addEventListener('pointerup', () => { viewer.orbit.enabled = true; }, { once: true });
         }
+        if (grabbed) return;
+        const start = { x: event.clientX, y: event.clientY };
+        window.addEventListener('pointerup', up => {
+            if (Math.hypot(up.clientX - start.x, up.clientY - start.y) < 5) pickPassive(up);
+        }, { once: true });
     });
 }
 
@@ -717,7 +914,7 @@ for (const side of ['l', 'r']) {
     });
 }
 $('#snap-view').onclick = () => updateCamera(true);
-$('#fit-frame').onclick = $('#fit-frame-2').onclick = () => { viewer.recordState(); fitFrame(); };
+$('#fit-frame').onclick = $('#fit-frame-2').onclick = () => { viewer.recordState(); if (doc.people) frameEveryone(); else fitFrame(); };
 $('#reset-bone').onclick = () => { viewer.recordState(); viewer.resetSelectedBone(); refreshControls(); schedulePreview(); };
 $('#reset-pose').onclick = () => { viewer.recordState(); resetPose(); doc.openpose = null; refreshFlips(); refreshControls(); schedulePreview(); };
 $('#undo').onclick = () => viewer.undo();
@@ -810,18 +1007,30 @@ async function serialize() {
     const poseReference = capture(doc.width, doc.height);
     updateCamera(false);
     doc.pose = savedPose();
-    return JSON.stringify({ version: 2, kind: 'vnccs-free-pose', ...doc, camera: FRONT, poseReference });
+    const people = doc.people ? peopleNow() : undefined;
+    return JSON.stringify({ version: 2, kind: 'vnccs-free-pose', ...doc, people, active: undefined, camera: FRONT, poseReference });
 }
 
-// Shared by the node payload and 我的姿势: any saved editor state → a complete doc.
-function docFrom(saved) {
+function personFrom(saved) {
     return {
         mesh: { ...DEFAULT_MESH, ...saved.mesh, breast_size: 0 }, pose: saved.pose || null, // flat chest is fixed
         proportions: { ...DEFAULT_PROPORTIONS, ...saved.proportions },
         transform: { ...NEUTRAL_TRANSFORM, ...saved.transform },
+        openpose: saved.openpose || null,
+        grips: { l: Number(saved.grips?.l) || 0, r: Number(saved.grips?.r) || 0 },
+    };
+}
+
+// Shared by the node payload and 我的姿势: any saved editor state → a complete doc.
+// The top-level person fields are always the person being edited; `people` holds everyone when
+// there are two (older single-person saves have no `people`).
+function docFrom(saved) {
+    const people = Array.isArray(saved.people) && saved.people.length > 1 ? saved.people.slice(0, 2).map(personFrom) : null;
+    const { grips, ...first } = people ? people[0] : personFrom(saved);
+    return {
+        ...first, people, active: 0,
         // The mannequin size lives only here; the node's width/height are the separate output size.
         width: round16(Number(saved.width) || doc.width), height: round16(Number(saved.height) || doc.height),
-        openpose: saved.openpose || null,
     };
 }
 
@@ -832,7 +1041,6 @@ function applyPayload(payload) {
     extraPrompt = payload.extra_prompt || '';
     $('#extra-prompt').value = extraPrompt;
     if (payload.referencePreview) {
-        personPreviewUrl = payload.referencePreview;
         $('#person-preview').src = payload.referencePreview;
         $('#person-preview-wrap').hidden = false;
     }
@@ -846,13 +1054,16 @@ async function start(payload) {
     $('[data-ratio=person]').hidden = !personAspect;
     if (!restored && personAspect) [doc.width, doc.height] = sizeForAspect(personAspect).map(round16);
     void checkEnvironment();
-    if (personPreviewUrl) void dwposeAvailable().then(available => { $('#detect-person').hidden = !available; });
+    personPreviewUrls = [payload?.referencePreview || null, payload?.referencePreview2 || null];
+    void dwposeAvailable().then(available => { dwposeReady = available; refreshPeople(); });
     loadModel(doc.pose);
+    rebuildPassives();
     setupInteraction();
     ready = true;
     if (restored) updateCamera(true);
     else fitFrame(true);
     refreshFlips();
+    refreshPeople();
     void loadBuiltin();
     void loadLibrary();
     void loadSavedList();
@@ -885,7 +1096,7 @@ function showError(error) {
 }
 
 if (!embedded) { $('#apply-editor').hidden = true; $('#cancel-editor').hidden = true; }
-window.freePose = { viewer, get doc() { return doc; }, serialize, prompt: promptText, fitFrame, importEntry, addFiles, saveCurrentPose, loadSavedPose, deleteSavedPose, applyCommonPose, galleries, detectPersonPose };
+window.freePose = { viewer, get doc() { return doc; }, serialize, prompt: promptText, fitFrame, importEntry, addFiles, saveCurrentPose, loadSavedPose, deleteSavedPose, applyCommonPose, galleries, detectPersonPose, addPerson, removePerson, switchPerson, frameEveryone };
 
 (async () => {
     await viewer.init();
