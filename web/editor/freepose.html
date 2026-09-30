@@ -30,6 +30,7 @@
 <div class="stage-top"><div class="stage-label"><i></i>橙框 = 正面输出画面</div><button id="snap-view" class="fp-chip">⊙ 回到正面视角</button></div>
 <figure class="fp-inset"><img id="inset-preview" alt="正面输出预览"><figcaption>正面输出</figcaption></figure>
 <div class="stage-bottom"><span id="selection-hint">拖空白处转视角 · 拖关节摆姿 · Shift+拖 移动人物</span><button id="fit-frame">⤢ 人物撑满画框</button></div>
+<div id="env-banner" class="fp-banner" role="alert" hidden></div>
 <div id="loading" class="fp-loading"><div class="fp-spinner"></div><span id="loading-text">正在加载 MakeHuman 人体（约 86MB）…</span></div><div id="toast" role="status"></div></div>
 <div class="interaction-bar"><span><kbd>拖空白</kbd> 转视角</span><span><kbd>拖关节</kbd> 摆姿</span><span><kbd>Shift+拖</kbd> 移动人物</span><span><kbd>右键/中键</kbd> 平移</span><span><kbd>滚轮</kbd> 远近</span></div></div>
 <aside class="right-panel">
@@ -41,7 +42,7 @@
 <label class="slider-label">大小<output id="zoom-value"></output></label><input id="zoom" type="range" min="0.2" max="6" step="0.01">
 <label class="slider-label">左右<output id="tx-value"></output></label><input id="tx" type="range" min="-20" max="20" step="0.05">
 <label class="slider-label">上下<output id="ty-value"></output></label><input id="ty" type="range" min="-20" max="20" step="0.05"></section>
-<section><div class="section-heading"><h2>人偶图尺寸</h2><small>仅 image1，与节点输出尺寸无关</small></div><div class="segmented ratios" id="ratios"><button data-ratio="1:1">1:1</button><button data-ratio="3:4">3:4</button><button data-ratio="4:3">4:3</button><button data-ratio="9:16">9:16</button><button data-ratio="16:9">16:9</button></div><div class="dimensions"><label>宽<input id="output-width" type="number" min="64" max="4096" step="16"></label><label>高<input id="output-height" type="number" min="64" max="4096" step="16"></label></div></section>
+<section><div class="section-heading"><h2>人偶图尺寸</h2><small>仅 image1，与节点输出尺寸无关</small></div><div class="segmented ratios" id="ratios"><button data-ratio="person" title="和人物图同比例，多手多脚更少" hidden>人物图</button><button data-ratio="1:1">1:1</button><button data-ratio="3:4">3:4</button><button data-ratio="4:3">4:3</button><button data-ratio="9:16">9:16</button><button data-ratio="16:9">16:9</button></div><div class="dimensions"><label>宽<input id="output-width" type="number" min="64" max="4096" step="16"></label><label>高<input id="output-height" type="number" min="64" max="4096" step="16"></label></div></section>
 </div>
 <div id="pose-panel" hidden>
 <section><div class="section-heading"><h2>选中关节</h2><span id="bone-name">未选择</span></div>
@@ -59,4 +60,4 @@
 <section class="description-section"><div class="section-heading"><h2>提示词</h2><button id="copy-description" class="text-button">复制</button></div><label class="field-label">补充要求（建议英文）<textarea id="extra-prompt" placeholder="例如：keep the outfit, soft studio light"></textarea></label><p id="description"></p><span class="description-note">LoRA 训练指令固定，补充内容另起一行附在后面</span></section>
 </aside></main>
 <footer class="app-footer"><span>Fisher Pose <span class="footer-dot">/</span> Free Pose · mannequin core © MiuProject (MIT)</span><span>人偶图 → image_1，人物图 → image_2</span></footer>
-<script type="module" src="freepose.mjs?v=20260926-2"></script></body></html>
+<script type="module" src="freepose.mjs?v=20260930-1"></script></body></html>

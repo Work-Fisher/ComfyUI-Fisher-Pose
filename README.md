@@ -36,6 +36,8 @@ https://github.com/user-attachments/assets/24dc201a-d9dc-4ac7-86a8-acc9d8f6dd7c
 - **比例调整**：头部大小、脖子、肩宽、躯干、上臂、小臂、大腿、小腿都可以单独拉长或缩短，姿势保持不变。
 - **两个尺寸互不影响**：人偶图尺寸在编辑器里设；输出尺寸由节点的 width/height 决定，可以直接接分辨率节点。
 - **应用即预览**：点「应用到节点」后，人偶图立刻显示在节点上，不用先跑一遍工作流。
+- **工作流很小**：人偶图存成 `ComfyUI/input/fisher_pose/` 里的文件，不再以 base64 塞进工作流，工作流只有十几 KB。
+- **人偶图比例跟随人物图**：新建姿势时人偶图自动取人物图的比例，也可以在「人偶图尺寸」里点「人物图」恢复。
 
 ## 效果
 
@@ -71,7 +73,7 @@ git clone https://github.com/Work-Fisher/ComfyUI-Fisher-Pose.git
 | `qwen_image_2.1_vae_*.safetensors` | `models/vae` | |
 | `VNCCS_QI2_PoseStudioV1.1.safetensors` | `models/loras` | **必需**，强度 1。下载：[MIUProject/VNCCS_PoseStudio_QI2.1](https://huggingface.co/MIUProject/VNCCS_PoseStudio_QI2.1) |
 
-ComfyUI 需要是带 `TextEncodeQwenImage21` 节点的新版本。
+**需要 ComfyUI 0.36.0 或更新**（Qwen Image 2.1 在这个版本进入 ComfyUI 核心）。版本太旧时，编辑器顶部会显示红色提示。
 
 ## 快速上手（自由姿势）
 
@@ -93,6 +95,15 @@ ComfyUI 需要是带 `TextEncodeQwenImage21` 节点的新版本。
 - **[ControlNet](https://github.com/lllyasviel/ControlNet)**：OpenPose 骨架的配色与连接顺序参考。
 - **[ComfyUI-qwenmultiangle](https://github.com/jtydhr88/ComfyUI-qwenmultiangle)**：视角分档与镜头词汇参考。
 - **[ComfyUI](https://github.com/comfyanonymous/ComfyUI)**：插件运行的平台。
+
+## 常见问题
+
+| 现象 | 原因和解决 |
+|---|---|
+| 「加载VAE 执行失败」、日志里有 `lora key not loaded`、出图和人物图一模一样 | ComfyUI 版本太旧，不支持 Qwen Image 2.1。便携版运行 `update/update_comfyui.bat`，git 安装执行 `git pull`，更新到 0.36.0 以上 |
+| 编辑器打不开，或提示 `Failed to load Pose Studio MakeHuman asset: HTTP 404` | 插件文件不完整，通常是网盘下载时漏了文件。从 GitHub 重新下载，确认 `web/vnccs/assets/pose_studio_makehuman.v2.bin`（约 86MB）存在 |
+| 找不到人偶图文件 | 人偶图存在 `input/fisher_pose/`，换电脑或清空过 input 文件夹时会丢。打开编辑器点一次「应用到节点」即可重新生成 |
+| 多手、多腿 | 人偶图比例尽量和人物图一致（「人偶图尺寸」里点「人物图」），并用「撑满」让人偶占满画面。人物图请用全身照，只有头像时模型不知道身体长什么样 |
 
 ## 许可
 

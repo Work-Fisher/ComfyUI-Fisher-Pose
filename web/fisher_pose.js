@@ -4,7 +4,7 @@ import { api } from "../../scripts/api.js";
 const EDITORS = {
     studio: { url: new URL("./editor/studio.html", import.meta.url), version: "20260922-preview2", title: "Fisher 机位与姿态编辑器",
               fields: ["scene_json", "output_mode", "width", "height", "extra_prompt"], data: "scene_json", image: "reference_image_1" },
-    freePose: { url: new URL("./editor/freepose.html", import.meta.url), version: "20260926-2", title: "Fisher 自由姿势编辑器",
+    freePose: { url: new URL("./editor/freepose.html", import.meta.url), version: "20260930-1", title: "Fisher 自由姿势编辑器",
                 fields: ["pose_json", "extra_prompt"], data: "pose_json", image: "reference_image" },
 };
 const editorFor = node => (node.comfyClass || node.type) === "FisherQwenFreePose" ? EDITORS.freePose : EDITORS.studio;
@@ -28,23 +28,50 @@ function upstreamPreview(node,inputName){
     return null;
 }
 
-// Show the applied mannequin image right away (on the node and on PreviewImage nodes fed by
-// its 人偶姿态图 output) without running the workflow. The frontend draws previews from
-// app.nodeOutputs, which must point at a served file, so the PNG goes to ComfyUI's temp folder.
-async function showPoseImage(node) {
-    let reference;
-    try { reference = JSON.parse(widget(node, "pose_json")?.value || "{}").poseReference; } catch { return; }
-    if (typeof reference !== "string" || !reference.startsWith("data:image/png;base64,")) return;
-    let hash = 2166136261;
-    for (let i = 0; i < reference.length; i += 7) hash = Math.imul(hash ^ reference.charCodeAt(i), 16777619);
+// Content hash for file names (crypto.subtle is missing when ComfyUI is opened over a LAN IP).
+async function contentHash(blob) {
+    const bytes = new Uint8Array(await blob.arrayBuffer());
+    let a = 2166136261, b = 0x9e3779b9;
+    for (let i = 0; i < bytes.length; i++) { a = Math.imul(a ^ bytes[i], 16777619); b = Math.imul(b ^ bytes[i], 0x85ebca6b); }
+    return (a >>> 0).toString(16).padStart(8, "0") + (b >>> 0).toString(16).padStart(8, "0") + bytes.length.toString(16);
+}
+
+async function uploadPng(dataUrl, prefix, type, subfolder = "") {
+    const blob = await (await fetch(dataUrl)).blob();
     const form = new FormData();
-    form.append("image", await (await fetch(reference)).blob(), `fisher_freepose_${(hash >>> 0).toString(16)}.png`);
-    form.append("type", "temp");
+    form.append("image", blob, `${prefix}_${await contentHash(blob)}.png`);
+    form.append("type", type);
+    form.append("subfolder", subfolder);
     form.append("overwrite", "true");
     const response = await api.fetchApi("/upload/image", { method: "POST", body: form });
-    if (!response.ok) return;
-    const { name, subfolder } = await response.json();
-    const images = [{ filename: name, subfolder: subfolder || "", type: "temp" }];
+    if (!response.ok) throw new Error(`upload failed: HTTP ${response.status}`);
+    const { name, subfolder: savedFolder } = await response.json();
+    return { filename: name, subfolder: savedFolder ?? subfolder, type };
+}
+
+// The mannequin PNG goes to input/fisher_pose/ instead of riding in the workflow as base64
+// (a workflow shrinks from ~900KB to ~100KB). The name is a content hash, so a new pose is a new
+// file and therefore a new node input. AIFISHER Canvas still sends base64, which the node accepts.
+async function storePoseReference(poseJson) {
+    const data = JSON.parse(poseJson);
+    if (typeof data.poseReference !== "string" || !data.poseReference.startsWith("data:image/png;base64,")) return poseJson;
+    data.poseReferenceFile = await uploadPng(data.poseReference, "pose", "input", "fisher_pose");
+    delete data.poseReference;
+    return JSON.stringify(data);
+}
+
+// Show the applied mannequin image right away (on the node and on PreviewImage nodes fed by
+// its 人偶姿态图 output) without running the workflow. The frontend draws previews from
+// app.nodeOutputs, which must point at a served file.
+async function showPoseImage(node) {
+    let data;
+    try { data = JSON.parse(widget(node, "pose_json")?.value || "{}"); } catch { return; }
+    let image = data.poseReferenceFile;
+    if (!image?.filename) {
+        if (typeof data.poseReference !== "string" || !data.poseReference.startsWith("data:image/png;base64,")) return;
+        image = await uploadPng(data.poseReference, "fisher_freepose", "temp");  // older workflows keep base64
+    }
+    const images = [{ filename: image.filename, subfolder: image.subfolder || "", type: image.type || "input" }];
     const slot = node.outputs?.findIndex(output => output.type === "IMAGE") ?? -1;
     const previews = (node.outputs?.[slot]?.links || []).map(id => app.graph.getNodeById(app.graph.links[id]?.target_id))
         .filter(target => target?.type === "PreviewImage");
@@ -97,7 +124,7 @@ function openEditor(node) {
         oldFocus?.focus();
         activeEditor = null;
     }
-    function receive(event) {
+    async function receive(event) {
         if (event.origin !== location.origin || event.source !== frame.contentWindow) return;
         if (event.data?.type === "fisher-ready") {
             const payload = Object.fromEntries(
@@ -115,8 +142,12 @@ function openEditor(node) {
         }
         if (event.data?.type === "fisher-close") close();
         if (event.data?.type === "fisher-apply") {
-            const payload = event.data.payload;
-            if (!payload || typeof payload[editor.data] !== "string") return;
+            const payload = { ...event.data.payload };
+            if (typeof payload[editor.data] !== "string") return;
+            if (editor === EDITORS.freePose) {
+                try { payload.pose_json = await storePoseReference(payload.pose_json); }
+                catch (error) { console.warn("Fisher: mannequin kept inline in the workflow", error); }
+            }
             for (const name of editor.fields) {
                 const item = widget(node, name);
                 item.value = payload[name];

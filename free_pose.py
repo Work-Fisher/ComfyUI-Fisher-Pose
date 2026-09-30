@@ -7,6 +7,7 @@ keeps exactly that order and wording instead of our long Chinese edit prompt.
 import numpy as np
 import torch
 
+from .env_check import require_qwen21
 from .pose_reference import reference_image
 
 VNCCS_INSTRUCTION = "Draw character from image2"
@@ -45,12 +46,10 @@ class FisherQwenFreePose:
             raise ValueError("Qwen 输出宽高须为16的倍数，请调整节点的 width/height。")
         if reference_image.ndim != 4 or reference_image.shape[0] != 1:
             raise ValueError("自由姿势只支持单张人物图，请不要接入图片批次。")
+        require_qwen21()
         mannequin = mannequin_tensor(pose_json)
         prompt = free_pose_prompt(extra_prompt)
-        try:
-            from comfy_extras.nodes_qwen import TextEncodeQwenImage21
-        except ImportError as error:
-            raise RuntimeError("此节点需要包含 TextEncodeQwenImage21 的新版 ComfyUI。") from error
+        from comfy_extras.nodes_qwen import TextEncodeQwenImage21
         result = TextEncodeQwenImage21.execute(clip=clip, prompt=prompt, negative_prompt="", vae=vae,
                     resolution=reference_resolution, images={"image_1": mannequin, "image_2": reference_image})
         positive, negative, encoded_latent = result.result

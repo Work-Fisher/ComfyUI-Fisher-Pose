@@ -4,9 +4,11 @@ from .gguf_clip import FisherQwen21GGUFCLIP
 from .free_pose import FisherQwenFreePose
 from .openpose_library import register_routes
 from .saved_poses import register_routes as register_saved_pose_routes
+from .env_check import register_routes as register_env_routes
 
 register_routes()
 register_saved_pose_routes()
+register_env_routes()
 
 NODE_CLASS_MAPPINGS = {"FisherPoseStudio": FisherPoseStudio, "FisherQwenPose": FisherQwenPose}
 NODE_DISPLAY_NAME_MAPPINGS = {"FisherPoseStudio": "Fisher 机位与姿态", "FisherQwenPose": "Fisher Qwen2.1 人物与姿态编码"}

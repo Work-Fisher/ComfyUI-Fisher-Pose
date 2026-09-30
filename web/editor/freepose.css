@@ -51,3 +51,4 @@
 .fp-delete{position:absolute;top:3px;right:3px;width:18px;height:18px;border-radius:50%;background:#1a1f2eb0;color:#fff;font-size:12px;font-style:normal;line-height:18px;text-align:center;opacity:0;cursor:pointer}
 .fp-saved .fp-thumb:hover .fp-delete{opacity:1}
 .fp-delete:hover{background:#e5484d}
+.fp-banner{position:absolute;top:56px;left:18px;right:18px;z-index:7;background:#fff1f0;border:1px solid #f3b1ab;color:#9b2c24;border-radius:8px;padding:10px 14px;font-size:12px;line-height:1.7;box-shadow:0 6px 20px #0003}

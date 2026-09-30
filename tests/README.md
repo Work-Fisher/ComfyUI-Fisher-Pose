@@ -13,3 +13,9 @@ node tests/test_openpose_lift.mjs
 ```
 
 `test_free_pose.py` 和 `test_qwen_bridge.py` 需要传入 ComfyUI 目录，用来导入 `TextEncodeQwenImage21`。
+
+`tests/e2e/` 是浏览器端到端场景：用无头 Chrome 打开真实的 ComfyUI 前端，载入自由姿势工作流后执行场景脚本（不会排队出图）。需要先启动 ComfyUI：
+
+```bash
+python tests/e2e/cdp_run.py tests/e2e/apply_stores_file.js --base http://127.0.0.1:8188
+```

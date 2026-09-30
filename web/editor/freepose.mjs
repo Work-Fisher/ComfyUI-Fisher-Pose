@@ -54,6 +54,7 @@ let ready = false;
 let selectedBoneName = null;
 let previewTimer = null;
 let morphTimer = null;
+let personAspect = null; // width / height of the connected person photo, when known
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 const round16 = value => clamp(Math.round(value / 16) * 16, 64, 4096);
@@ -563,10 +564,7 @@ function refreshControls() {
     $('#output-width').value = doc.width;
     $('#output-height').value = doc.height;
     $('#preview-size').textContent = `${doc.width}×${doc.height}`;
-    for (const button of document.querySelectorAll('#ratios button')) {
-        const [a, b] = button.dataset.ratio.split(':').map(Number);
-        button.classList.toggle('active', Math.abs(doc.width / doc.height - a / b) < 0.02);
-    }
+    for (const button of document.querySelectorAll('#ratios button')) button.classList.toggle('active', Math.abs(doc.width / doc.height - ratioOf(button)) < 0.02);
     for (const [key] of BODY_SLIDERS) {
         const input = $(`#body-${key}`);
         if (input) { input.value = doc.mesh[key]; setOutput(`body-${key}`, key === 'age' ? String(doc.mesh[key]) : Number(doc.mesh[key]).toFixed(2)); }
@@ -640,12 +638,32 @@ function setSize(width, height) {
 }
 $('#output-width').onchange = event => setSize(Number(event.target.value) || doc.width, doc.height);
 $('#output-height').onchange = event => setSize(doc.width, Number(event.target.value) || doc.height);
-for (const button of document.querySelectorAll('#ratios button')) {
-    button.onclick = () => {
-        const [a, b] = button.dataset.ratio.split(':').map(Number);
-        const longSide = Math.max(doc.width, doc.height);
-        setSize(a >= b ? longSide : longSide * a / b, a >= b ? longSide * b / a : longSide);
-    };
+// Viewers found that a mannequin image shaped like the person photo gives fewer extra hands and legs.
+const ratioOf = button => button.dataset.ratio === 'person' ? personAspect || 1 : button.dataset.ratio.split(':').map(Number).reduce((a, b) => a / b);
+function sizeForAspect(aspect) {
+    const longSide = Math.max(doc.width, doc.height);
+    return aspect >= 1 ? [longSide, longSide / aspect] : [longSide * aspect, longSide];
+}
+for (const button of document.querySelectorAll('#ratios button')) button.onclick = () => setSize(...sizeForAspect(ratioOf(button)));
+
+async function loadPersonAspect(url) {
+    if (!url) return null;
+    try {
+        const image = new Image();
+        image.src = url;
+        await image.decode();
+        return image.naturalWidth / image.naturalHeight || null;
+    } catch { return null; }
+}
+
+// Old ComfyUI cores cannot run Qwen Image 2.1 at all (see env_check.py): say so before anyone poses.
+async function checkEnvironment() {
+    try {
+        const env = await (await fetch('/fisher_pose/env', { cache: 'no-store' })).json();
+        if (env.qwen21) return;
+        $('#env-banner').textContent = `${env.updateHint}（当前版本 ${env.version}）`;
+        $('#env-banner').hidden = false;
+    } catch { /* standalone preview, or AIFISHER Canvas which does not proxy this route */ }
 }
 
 const bodyContainer = $('#body-sliders');
@@ -731,6 +749,10 @@ function applyPayload(payload) {
 let pendingPayload = null;
 async function start(payload) {
     const restored = payload ? applyPayload(payload) : false;
+    personAspect = await loadPersonAspect(payload?.referencePreview);
+    $('[data-ratio=person]').hidden = !personAspect;
+    if (!restored && personAspect) [doc.width, doc.height] = sizeForAspect(personAspect).map(round16);
+    void checkEnvironment();
     loadModel(doc.pose);
     setupInteraction();
     ready = true;
