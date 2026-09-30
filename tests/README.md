@@ -19,3 +19,5 @@ node tests/test_openpose_lift.mjs
 ```bash
 python tests/e2e/cdp_run.py tests/e2e/apply_stores_file.js --base http://127.0.0.1:8188
 ```
+
+常用姿势的缩略图由 `tools/build_common_poses.py` 在真实编辑器里渲染（改了 `web/editor/common-poses.mjs` 之后重跑，`--review` 会输出正面加侧面的检查图）。

@@ -23,6 +23,30 @@ def mannequin_tensor(pose_json):
     return torch.from_numpy(np.asarray(reference_image(pose_json)).astype(np.float32) / 255).unsqueeze(0)
 
 
+class FisherPoseImage:
+    """Only the mannequin render and the LoRA instruction, for any model or hand-built workflow (e.g. Qwen 2511)."""
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {"required": {
+            "extra_prompt": ("STRING", {"default": "", "multiline": True}),
+            "pose_json": ("STRING", {"default": "{}", "multiline": True}),
+        }, "optional": {
+            # Only read by the editor: the mannequin takes this photo's aspect ratio.
+            "reference_image": ("IMAGE",),
+        }}
+
+    RETURN_TYPES = ("IMAGE", "STRING")
+    RETURN_NAMES = ("人偶姿态图", "提示词")
+    FUNCTION = "render"
+    CATEGORY = "Fisher/姿态与机位"
+    DESCRIPTION = "只输出人偶姿态图和提示词，不需要 clip / vae，可以接到任何图像编辑工作流里当姿势参考（例如 Qwen Image 2511）。人偶图接 image1、人物图接 image2 时，提示词用 Draw character from image2。"
+
+    def render(self, extra_prompt, pose_json, reference_image=None):
+        return {"ui": {"fisher_prompt": [free_pose_prompt(extra_prompt)]},
+                "result": (mannequin_tensor(pose_json), free_pose_prompt(extra_prompt))}
+
+
 class FisherQwenFreePose:
     @classmethod
     def INPUT_TYPES(cls):

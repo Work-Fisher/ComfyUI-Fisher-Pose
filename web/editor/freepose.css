@@ -42,7 +42,7 @@
 .fp-loading[hidden]{display:none}
 .fp-spinner{width:30px;height:30px;border:3px solid #ffffff30;border-top-color:#8aa4ff;border-radius:50%;animation:fp-spin 1s linear infinite}
 @keyframes fp-spin{to{transform:rotate(360deg)}}
-.fp-sources{margin-bottom:10px}.fp-sources button{padding:6px 4px;font-size:11px}
+.fp-sources{margin-bottom:10px}.fp-sources button{padding:5px 3px;font-size:11px;white-space:normal;line-height:1.35}
 .fp-save{margin-bottom:10px;border-color:#c5d2fb;color:#3858cc;background:#f3f6ff}
 .fp-save:hover{background:#e8eeff}
 .fp-saved .fp-thumb{background:#fff;border-color:#e3e8f1;aspect-ratio:1}
@@ -52,3 +52,6 @@
 .fp-saved .fp-thumb:hover .fp-delete{opacity:1}
 .fp-delete:hover{background:#e5484d}
 .fp-banner{position:absolute;top:56px;left:18px;right:18px;z-index:7;background:#fff1f0;border:1px solid #f3b1ab;color:#9b2c24;border-radius:8px;padding:10px 14px;font-size:12px;line-height:1.7;box-shadow:0 6px 20px #0003}
+.fp-thumb.fp-mannequin{background:#fff;border-color:#e3e8f1;aspect-ratio:3/4}
+.fp-thumb.fp-mannequin.active{border-color:#6e8cff}
+.fp-thumb.fp-mannequin span{color:#fff;background:#1a1f2ecc;font-size:9px;padding:2px 4px}

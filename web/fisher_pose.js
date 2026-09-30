@@ -4,10 +4,11 @@ import { api } from "../../scripts/api.js";
 const EDITORS = {
     studio: { url: new URL("./editor/studio.html", import.meta.url), version: "20260922-preview2", title: "Fisher 机位与姿态编辑器",
               fields: ["scene_json", "output_mode", "width", "height", "extra_prompt"], data: "scene_json", image: "reference_image_1" },
-    freePose: { url: new URL("./editor/freepose.html", import.meta.url), version: "20260930-1", title: "Fisher 自由姿势编辑器",
+    freePose: { url: new URL("./editor/freepose.html", import.meta.url), version: "20260930-2", title: "Fisher 自由姿势编辑器",
                 fields: ["pose_json", "extra_prompt"], data: "pose_json", image: "reference_image" },
 };
-const editorFor = node => (node.comfyClass || node.type) === "FisherQwenFreePose" ? EDITORS.freePose : EDITORS.studio;
+const FREE_POSE_NODES = ["FisherQwenFreePose", "FisherPoseImage"];
+const editorFor = node => FREE_POSE_NODES.includes(node.comfyClass || node.type) ? EDITORS.freePose : EDITORS.studio;
 const widget = (node, name) => node.widgets.find(item => item.name === name);
 let activeEditor = null;
 
@@ -169,8 +170,8 @@ function openEditor(node) {
 app.registerExtension({
     name: "Fisher.PoseStudio",
     async beforeRegisterNodeDef(nodeType, nodeData) {
-        if (!["FisherPoseStudio", "FisherQwenPose", "FisherQwenFreePose"].includes(nodeData.name)) return;
-        const freePose = nodeData.name === "FisherQwenFreePose";
+        if (!["FisherPoseStudio", "FisherQwenPose", ...FREE_POSE_NODES].includes(nodeData.name)) return;
+        const freePose = FREE_POSE_NODES.includes(nodeData.name);
         const original = nodeType.prototype.onNodeCreated;
         nodeType.prototype.onNodeCreated = function () {
             const result = original?.apply(this, arguments);

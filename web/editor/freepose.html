@@ -4,10 +4,10 @@
 <header class="appbar"><div class="brand"><span class="brand-icon">⌘</span><b>Fisher Pose</b><span class="divider"></span><span>自由姿势</span><small>单人 · VNCCS 人偶 · 正面输出</small></div><div class="header-actions"><span id="save-status">编辑后应用到节点</span><button id="undo" title="撤销 Ctrl+Z">↶ 撤销</button><button id="redo" title="重做 Ctrl+Shift+Z">↷</button><button id="cancel-editor">取消</button><button class="primary" id="apply-editor" disabled>应用到节点</button></div></header>
 <main class="fp-main">
 <aside class="left-panel fp-left">
-<section><div class="section-heading"><h2>OpenPose 一键摆姿</h2><span><small id="gallery-count"></small> <button class="text-button" id="clear-gallery" hidden>清空</button></span></div>
-<div class="segmented fp-sources" id="gallery-source"><button data-source="builtin" class="active">FISHER小彩蛋</button><button data-source="library">我的图库</button></div>
+<section><div class="section-heading"><h2>一键摆姿</h2><span><small id="gallery-count"></small> <button class="text-button" id="clear-gallery" hidden>清空</button></span></div>
+<div class="segmented fp-sources" id="gallery-source"><button data-source="common" class="active">常用姿势</button><button data-source="builtin">FISHER小彩蛋</button><button data-source="library">我的图库</button></div>
 <div class="fp-pick"><label class="fp-button"><input type="file" id="pick-folder" webkitdirectory multiple>选择文件夹</label><label class="fp-button"><input type="file" id="pick-files" accept="image/*" multiple>选择图片</label></div>
-<input id="gallery-filter" class="fp-search" type="search" placeholder="按编号或文件名筛选" hidden>
+<input id="gallery-filter" class="fp-search" type="search" placeholder="按名称或编号筛选" hidden>
 <div id="gallery" class="fp-gallery"><p class="muted">选 OpenPose 骨架图（黑底彩色），点缩略图即摆好姿势。也可把图片拖到这里。</p></div>
 <p id="import-status" class="muted" role="status"></p></section>
 <section id="saved-section"><div class="section-heading"><h2>我的姿势</h2><small id="saved-count"></small></div>
@@ -60,4 +60,4 @@
 <section class="description-section"><div class="section-heading"><h2>提示词</h2><button id="copy-description" class="text-button">复制</button></div><label class="field-label">补充要求（建议英文）<textarea id="extra-prompt" placeholder="例如：keep the outfit, soft studio light"></textarea></label><p id="description"></p><span class="description-note">LoRA 训练指令固定，补充内容另起一行附在后面</span></section>
 </aside></main>
 <footer class="app-footer"><span>Fisher Pose <span class="footer-dot">/</span> Free Pose · mannequin core © MiuProject (MIT)</span><span>人偶图 → image_1，人物图 → image_2</span></footer>
-<script type="module" src="freepose.mjs?v=20260930-1"></script></body></html>
+<script type="module" src="freepose.mjs?v=20260930-2"></script></body></html>

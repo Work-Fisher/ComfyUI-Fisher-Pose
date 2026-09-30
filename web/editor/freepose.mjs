@@ -6,6 +6,7 @@ import { loadMorphPack, solveMorph, buildStaticModelData } from '../vnccs/vnccs_
 import { HAND_PRESETS } from '../vnccs/vnccs_hand_presets.mjs';
 import { readSkeletonImage } from './pose-import.mjs';
 import { liftOpenPose, WORLD_KEYPOINT_NAMES } from './openpose-lift.mjs';
+import { COMMON_POSES, directionKeypoints } from './common-poses.mjs';
 
 const $ = selector => document.querySelector(selector);
 const embedded = new URLSearchParams(location.search).has('embedded');
@@ -210,27 +211,48 @@ function restJoints() {
     return { rest, head: worldOf('head'), pelvis: worldOf('pelvis') };
 }
 
-function applyOpenPose() {
-    const { points, flips } = doc.openpose;
+// Back to neutral framing and the standing pose, then IK the mannequin onto keypoints that
+// `build(rest, head)` returns relative to the hip midpoint (as {kps, ...extra}); returns extra.
+function importKeypoints(build) {
     viewer.recordState();
     doc.transform = { ...NEUTRAL_TRANSFORM };
     viewer.setActiveCharacterAppearance({ transform: doc.transform });
     resetPose();
     viewer.skinnedMesh.updateMatrixWorld(true);
     const { rest, head, pelvis } = restJoints();
-    const { kps, facingAway } = liftOpenPose(points, rest, flips);
-    // The spine IK target is the head bone origin, not the nose: keep the nose direction at head-bone distance.
-    const headDistance = Math.hypot(...head.map((v, i) => v - rest.neck[i]));
-    const direction = kps.head.map((v, i) => v - kps.neck[i]);
-    const norm = Math.hypot(...direction) || 1;
-    kps.head = kps.neck.map((v, i) => v + direction[i] / norm * headDistance);
+    const { kps, ...extra } = build(rest, head);
     const THREE = viewer.THREE;
     const worldKps = Object.fromEntries(Object.entries(WORLD_KEYPOINT_NAMES).map(([key, name]) => [name, new THREE.Vector3(...kps[key].map((v, i) => v + pelvis[i]))]));
-    // Hip sockets, head, hands and feet have no reliable 2D source; keep the mannequin's own.
+    // Hip sockets, head, hands and feet have no reliable source; keep the mannequin's own.
     viewer.applyWorldKeypointImport(worldKps, { drawFigure: false, placeHipRoots: false, alignHead: false, alignHands: false, alignFeet: false, dispatchPoseChange: false });
+    return extra;
+}
+
+function applyOpenPose() {
+    const { points, flips } = doc.openpose;
+    const { facingAway } = importKeypoints((rest, head) => {
+        const lifted = liftOpenPose(points, rest, flips);
+        // The spine IK target is the head bone origin, not the nose: keep the nose direction at head-bone distance.
+        const headDistance = Math.hypot(...head.map((v, i) => v - rest.neck[i]));
+        const direction = lifted.kps.head.map((v, i) => v - lifted.kps.neck[i]);
+        const norm = Math.hypot(...direction) || 1;
+        lifted.kps.head = lifted.kps.neck.map((v, i) => v + direction[i] / norm * headDistance);
+        return lifted;
+    });
     fitFrame(true);
     refreshFlips(facingAway);
     return facingAway;
+}
+
+// 常用姿势: direction specs (common-poses.mjs) solved on the current body, so they fit any shape.
+function applyCommonPose(entry) {
+    importKeypoints((rest, head) => ({ kps: directionKeypoints(entry.spec, rest, head) }));
+    if (entry.spec.turn) viewer.setModelRotation(0, entry.spec.turn, 0);
+    doc.openpose = null;
+    refreshFlips();
+    fitFrame(true);
+    for (const button of document.querySelectorAll('.fp-thumb')) button.classList.toggle('active', button.dataset.key === entry.key);
+    $('#import-status').textContent = `已摆成「${entry.name}」。可以再拖关节微调。`;
 }
 
 async function importEntry(entry) {
@@ -279,9 +301,12 @@ for (const button of document.querySelectorAll('[data-flip]')) {
 // the editor. Standalone (no ComfyUI server) the library only lasts for this page.
 const LIBRARY_URL = '/fisher_pose/openpose_library';
 const BUILTIN_URL = '/fisher_pose/builtin_poses';
-const SOURCE_NAMES = { builtin: 'FISHER小彩蛋', library: '我的图库' };
-const galleries = { builtin: [], library: [] };
-let gallerySource = 'builtin';
+const SOURCE_NAMES = { common: '常用姿势', builtin: 'FISHER小彩蛋', library: '我的图库' };
+const galleries = {
+    common: COMMON_POSES.map(spec => ({ key: 'common:' + spec.id, name: spec.name, url: new URL(`common-poses/${spec.id}.webp`, import.meta.url).href, spec })),
+    builtin: [], library: [],
+};
+let gallerySource = 'common';
 let libraryAvailable = false;
 const byName = (a, b) => a.name.localeCompare(b.name, 'zh', { numeric: true });
 const entryLabel = entry => entry.name.replace(/_bone_structure|\.(png|jpe?g|webp)$/gi, '');
@@ -293,13 +318,13 @@ function renderGallery() {
     const container = $('#gallery');
     container.replaceChildren(...shown.map(entry => {
         const button = document.createElement('button');
-        button.className = 'fp-thumb' + (entry.failed ? ' failed' : '') + (doc.openpose?.key === entry.key ? ' active' : '');
+        button.className = 'fp-thumb' + (entry.spec ? ' fp-mannequin' : '') + (entry.failed ? ' failed' : '') + (doc.openpose?.key === entry.key ? ' active' : '');
         button.dataset.key = entry.key;
         button.title = entry.name;
         button.innerHTML = `<img loading="lazy" alt=""><span></span>`;
         button.querySelector('img').src = entry.url;
         button.querySelector('span').textContent = entryLabel(entry);
-        button.onclick = () => importEntry(entry);
+        button.onclick = () => (entry.spec ? applyCommonPose(entry) : importEntry(entry));
         return button;
     }));
     for (const button of document.querySelectorAll('#gallery-source button')) {
@@ -791,7 +816,7 @@ function showError(error) {
 }
 
 if (!embedded) { $('#apply-editor').hidden = true; $('#cancel-editor').hidden = true; }
-window.freePose = { viewer, get doc() { return doc; }, serialize, prompt: promptText, fitFrame, importEntry, addFiles, saveCurrentPose, loadSavedPose, deleteSavedPose };
+window.freePose = { viewer, get doc() { return doc; }, serialize, prompt: promptText, fitFrame, importEntry, addFiles, saveCurrentPose, loadSavedPose, deleteSavedPose, applyCommonPose, galleries };
 
 (async () => {
     await viewer.init();
