@@ -6,7 +6,9 @@
 
 在 ComfyUI 中编辑单人或双人姿势，用 Qwen Image 2.1 生成对应画面。
 
-[下载插件](https://github.com/Work-Fisher/ComfyUI-Fisher-Pose/archive/refs/heads/main.zip) · [下载工作流](https://raw.githubusercontent.com/Work-Fisher/ComfyUI-Fisher-Pose/main/workflows/Fisher-Pose-Studio.json) · [安装与模型](docs/installation.md) · [使用指南](docs/usage.md)
+[下载插件](https://github.com/Work-Fisher/ComfyUI-Fisher-Pose/archive/refs/heads/main.zip) · [下载工作流](https://raw.githubusercontent.com/Work-Fisher/ComfyUI-Fisher-Pose/main/workflows/Fisher-Pose-Studio.json)
+
+[安装与模型](docs/installation.md) · [使用指南](docs/usage.md)
 
 </div>
 
