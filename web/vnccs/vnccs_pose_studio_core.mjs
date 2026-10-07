@@ -5581,14 +5581,15 @@ export class PoseViewerCore {
         }
     }
 
-    capture(width, height, zoom, bgColor, offsetX = 0, offsetY = 0, yawDeg = 0, pitchDeg = 0) {
+    capture(width, height, zoom, bgColor, offsetX = 0, offsetY = 0, yawDeg = 0, pitchDeg = 0, includeSkeleton = false) {
         if (!this.initialized) return null;
 
         // Ensure camera is setup
         this.updateCaptureCamera(width, height, zoom, offsetX, offsetY, yawDeg, pitchDeg);
 
         // Hide UI elements
-        const markersVisible = this.jointMarkers[0]?.visible ?? true;
+        const markerStates = this.jointMarkers.map(marker => ({ visible: marker.visible, material: marker.material }));
+        const skeletonVisible = this.skeletonHelper?.visible;
         const transformVisible = this.transform ? this.transform.visible : true;
 
         // Hide Helpers
@@ -5603,7 +5604,7 @@ export class PoseViewerCore {
             ? this._handRings.map((ring) => ring?.visible ?? false)
             : null;
         if (this.transform) this.transform.visible = false;
-        if (this.skeletonHelper) this.skeletonHelper.visible = false;
+        if (this.skeletonHelper) this.skeletonHelper.visible = includeSkeleton;
         if (this.gridHelper) this.gridHelper.visible = false;
         if (this.captureFrame) this.captureFrame.visible = false;
         if (this._kpFigureGroup) this._kpFigureGroup.visible = false;
@@ -5616,7 +5617,10 @@ export class PoseViewerCore {
                 if (ring) ring.visible = false;
             });
         }
-        this.jointMarkers.forEach(m => m.visible = false);
+        this.jointMarkers.forEach(m => {
+            m.visible = includeSkeleton && this._shouldMarkerBeVisible(m);
+            if (includeSkeleton) m.material = this.markerMatNormal;
+        });
 
         // Hide IK effectors and pole targets
         const effectorVisibility = {};
@@ -5629,6 +5633,29 @@ export class PoseViewerCore {
             for (const [key, pole] of Object.entries(this.ikController.poleTargets)) {
                 poleVisibility[key] = pole.visible;
                 pole.visible = false;
+            }
+        }
+
+        // Passive people need their own overlay too; keep these objects capture-local.
+        // Registered before they are built, so `finally` removes whatever exists even if building throws.
+        const passiveOverlays = [];
+        if (includeSkeleton) {
+            try {
+                for (const entry of this.passiveCharacters.values()) {
+                    const overlay = { helper: null, markers: [] };
+                    passiveOverlays.push(overlay);
+                    overlay.helper = new this.THREE.SkeletonHelper(entry.mesh);
+                    this.scene.add(overlay.helper);
+                    for (const bone of entry.mesh.skeleton?.bones || []) {
+                        const index = this.boneList.findIndex(active => active.name === bone.name);
+                        if (index < 0 || !this._shouldMarkerBeVisible({ userData: { boneIndex: index } })) continue;
+                        const marker = new this.THREE.Mesh(this._isFingerHandBoneName(bone.name) ? this.markerGeoFinger : this.markerGeoNormal, this.markerMatNormal);
+                        marker.renderOrder = 999;
+                        bone.add(marker); overlay.markers.push(marker);
+                    }
+                }
+            } catch (e) {
+                console.error("Capture skeleton overlay failed:", e);
             }
         }
 
@@ -5651,12 +5678,16 @@ export class PoseViewerCore {
         } catch (e) {
             console.error("Capture failed:", e);
         } finally {
+            for (const { helper, markers } of passiveOverlays) {
+                if (helper) { helper.removeFromParent(); helper.geometry.dispose(); helper.material.dispose(); }
+                for (const marker of markers) marker.removeFromParent();
+            }
             // Restore state
             this.scene.background = oldBg;
 
-            this.jointMarkers.forEach(m => m.visible = markersVisible && this._shouldMarkerBeVisible(m));
+            this.jointMarkers.forEach((m, i) => { m.visible = markerStates[i].visible; m.material = markerStates[i].material; });
             if (this.transform) this.transform.visible = transformVisible;
-            if (this.skeletonHelper) this.skeletonHelper.visible = true;
+            if (this.skeletonHelper) this.skeletonHelper.visible = skeletonVisible;
             if (this.gridHelper) this.gridHelper.visible = true;
             if (this.captureFrame) this.captureFrame.visible = true;
             if (this._kpFigureGroup) this._kpFigureGroup.visible = importedFigureVisibility.kp ?? this.importedFigureVisible;

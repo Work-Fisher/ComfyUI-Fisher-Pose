@@ -88,5 +88,56 @@ class AnyAngleCameraTests(unittest.TestCase):
         self.assertEqual(anyangle.render_size(4096, 2048), (2048, 1024))  # RenderSplat's limit
 
 
+class ResultSelectionTests(unittest.TestCase):
+    def test_front_skips_camera_branch(self):
+        node = anyangle.FisherPoseResult()
+        front = torch.zeros(1, 64, 64, 3)
+        self.assertEqual(node.check_lazy_status("{}"), ["front_image"])
+        self.assertEqual(node.check_lazy_status("{}", front_image=front), [])
+        self.assertIs(node.select("{}", front_image=front)[0], front)
+
+    def test_camera_requires_only_camera_result(self):
+        node = anyangle.FisherPoseResult()
+        pose = json.dumps({"anyAngle": {"enabled": True, "camera": {"position": [0, 0, 2], "forward": [0, 0, -1]}}})
+        image = torch.ones(1, 64, 64, 3)
+        self.assertEqual(node.check_lazy_status(pose), ["camera_image"])
+        self.assertEqual(node.check_lazy_status(pose, camera_image=image), [])
+        self.assertIs(node.select(pose, camera_image=image)[0], image)
+
+    def test_enabled_without_a_placed_camera_counts_as_front(self):
+        # Same rule as FisherAnyAngleCamera, so the two nodes never disagree.
+        node = anyangle.FisherPoseResult()
+        pose = json.dumps({"anyAngle": {"enabled": True}})
+        self.assertEqual(node.check_lazy_status(pose), ["front_image"])
+
+    def test_muted_camera_branch_is_not_waited_for(self):
+        node = anyangle.FisherPoseResult()
+        pose = json.dumps({"anyAngle": {"enabled": True, "camera": {"position": [0, 0, 2], "forward": [0, 0, -1]}}})
+        prompt = {"29": {"inputs": {"pose_json": ["30", 0], "front_image": ["8", 0]}}}  # camera_image dropped
+        self.assertEqual(node.check_lazy_status(pose, prompt=prompt, unique_id="29"), [])
+        with self.assertRaisesRegex(ValueError, "恢复正面"):
+            node.select(pose, front_image=torch.zeros(1, 8, 8, 3), prompt=prompt, unique_id="29")
+
+
+class ShotTests(unittest.TestCase):
+    def test_shot_overrides_only_camera_fields(self):
+        pose = json.dumps({"kind": "vnccs-free-pose", "width": 768, "anyAngle": {"enabled": False}})
+        shot = json.dumps({"anyAngle": {"enabled": True, "yaw": 30}, "shotPreviewFile": {"filename": "shot.png"}, "width": 1})
+        merged = json.loads(anyangle.FisherShot().merge(pose, shot)[0])
+        self.assertEqual(merged["anyAngle"], {"enabled": True, "yaw": 30})
+        self.assertEqual(merged["shotPreviewFile"], {"filename": "shot.png"})
+        self.assertEqual(merged["width"], 768)  # pose fields are never taken from the shot
+
+    def test_empty_shot_keeps_the_pose_as_is(self):
+        pose = json.dumps({"anyAngle": {"enabled": True, "yaw": 10}})
+        self.assertEqual(json.loads(anyangle.FisherShot().merge(pose, "{}")[0]), json.loads(pose))
+
+    def test_editor_zoom_is_preserved_in_render_fov(self):
+        camera = {"position": [0, 0, 2], "forward": [0, 0, -1], "fov": 35, "zoom": 2}
+        info = anyangle.camera_info(camera, torch.zeros(3), 1, 1024, 1024)
+        expected = math.degrees(2 * math.atan(math.tan(math.radians(17.5)) / 2))
+        self.assertAlmostEqual(info['fov'], expected)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -63,3 +63,8 @@ def register_routes():
     @routes.get("/fisher_pose/env")
     async def get_env(request):
         return web.json_response(status())
+
+    @routes.get("/fisher_pose/studio_workflow")
+    async def get_studio_workflow(request):
+        from pathlib import Path
+        return web.FileResponse(Path(__file__).parent / "workflows" / "Fisher-Pose-Studio.json")

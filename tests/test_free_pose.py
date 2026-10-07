@@ -14,7 +14,7 @@ spec = importlib.util.spec_from_file_location("fisher_test", ROOT / "__init__.py
 module = importlib.util.module_from_spec(spec)
 sys.modules[spec.name] = module
 spec.loader.exec_module(module)
-from fisher_test.free_pose import FisherQwenFreePose, free_pose_prompt
+from fisher_test.free_pose import FisherQwenFreePose, free_pose_prompt, SINGLE_PERSON_INSTRUCTION
 
 
 class RecordingClip:
@@ -50,7 +50,9 @@ class FreePoseTests(unittest.TestCase):
     def test_vnccs_order_prompt_and_latent(self):
         args = self.args()
         positive, negative, latent, prompt, mannequin, passed = FisherQwenFreePose().encode(**args)['result']
-        self.assertEqual(prompt, 'Draw character from image2')
+        self.assertEqual(prompt, SINGLE_PERSON_INSTRUCTION)
+        self.assertIn('exactly one person', prompt)
+        self.assertIn('facial identity', prompt)
         calls = args['clip'].calls
         self.assertEqual(calls[0][0], prompt)
         self.assertEqual(calls[1][0], '')
@@ -72,7 +74,7 @@ class FreePoseTests(unittest.TestCase):
         self.assertEqual(tuple(latent['samples'].shape), (1, 64, 68, 120))
 
     def test_extra_prompt_follows_instruction(self):
-        self.assertEqual(free_pose_prompt('  red dress \n\n studio light '), 'Draw character from image2\nred dress\nstudio light')
+        self.assertEqual(free_pose_prompt('  red dress \n\n studio light '), SINGLE_PERSON_INSTRUCTION + '\nred dress\nstudio light')
 
     def test_invalid_inputs_do_not_encode(self):
         cases = [
@@ -88,6 +90,7 @@ class FreePoseTests(unittest.TestCase):
 
 def two_people(xs=(-4.0, 5.0)):
     data = json.loads(pose_json((768, 512)))
+    data['referenceMode'] = 'separate'
     data['people'] = [{'transform': {'x': x, 'y': 0, 'z': 0, 'zoom': 1}} for x in xs]
     return json.dumps(data)
 
@@ -106,6 +109,42 @@ class TwoPeopleTests(unittest.TestCase):
 
     def test_sides_follow_where_people_stand(self):
         self.assertTrue(free_pose_prompt('', two_people((6.0, -3.0))).startswith('Draw the right character from image2'))
+
+    def test_group_photo_stays_whole_even_with_legacy_split(self):
+        data = json.loads(two_people()); data['referenceMode'] = 'group'
+        photo = torch.cat([torch.full((1,64,24,3),.2), torch.full((1,64,24,3),.8)], dim=2)
+        for swapped in (False, True):
+            for split in (.1, .5, .9):
+                data.update(swapPeople=swapped, groupSplit=split)
+                args = self.args(pose_json=json.dumps(data), reference_image=photo)
+                result = FisherQwenFreePose().encode(**args)['result']
+                images = args['clip'].calls[0][1]['images']
+                self.assertEqual(len(images), 2)
+                self.assertEqual(len(result[0][0][1]['reference_latents']), 2)
+                self.assertAlmostEqual(float(images[1].mean()), .5, delta=.01)
+                center = images[1].shape[2] // 2
+                self.assertAlmostEqual(float(images[1][:,:,:center,:].mean()), .2, delta=.02)
+                self.assertAlmostEqual(float(images[1][:,:,center:,:].mean()), .8, delta=.02)
+                self.assertNotIn('image3', result[3])
+                source = 'left' if swapped else 'right'
+                self.assertIn(f'person on the {source} side of the original group photo in image2 in the pose and position of the left mannequin', result[3])
+
+    def test_group_binding_follows_ids_after_moving(self):
+        data = json.loads(two_people((6,-3))); data['referenceMode'] = 'group'
+        prompt = free_pose_prompt('', json.dumps(data))
+        self.assertIn('person on the right side of the original group photo in image2 in the pose and position of the right mannequin', prompt)
+        self.assertIn('person on the left side of the original group photo in image2 in the pose and position of the left mannequin', prompt)
+
+    def test_legacy_two_photos_keep_separate_mode(self):
+        data = json.loads(two_people()); data.pop('referenceMode')
+        args = self.args(pose_json=json.dumps(data), reference_image_2=torch.zeros(1,64,48,3))
+        prompt = FisherQwenFreePose().encode(**args)['result'][3]
+        self.assertIn('image3', prompt)
+
+    def test_group_rejects_ambiguous_second_photo(self):
+        data = json.loads(two_people()); data['referenceMode'] = 'group'
+        with self.assertRaisesRegex(ValueError, '合照模式'):
+            FisherQwenFreePose().encode(**self.args(pose_json=json.dumps(data), reference_image_2=torch.zeros(1,64,48,3)))
 
     def test_wiring_mismatches_are_explained(self):
         for args, message in [(self.args(pose_json=two_people()), 'reference_image_2'),
@@ -137,6 +176,21 @@ class OpenPoseLibraryTests(unittest.TestCase):
         self.assertEqual(len(names), 209)
         self.assertEqual(names[:3], ['1.png', '2.png', '3.png'])
         self.assertEqual(names[-1], '209.png')
+
+
+class AnyAngleEncodeTests(unittest.TestCase):
+    def test_fixed_inputs_encode_both_references_with_vae(self):
+        from fisher_test.fisher_anyangle import FisherAnyAngleEncode, ANYANGLE_PROMPT
+        clip = RecordingClip()
+        front = torch.full((1, 64, 96, 3), .2)
+        coarse = torch.full((1, 64, 96, 3), .8)
+        positive, negative, latent = FisherAnyAngleEncode().encode(clip, DummyVae(), front, coarse, 256)
+        self.assertEqual(clip.calls[0][0], ANYANGLE_PROMPT)
+        self.assertEqual(len(positive[0][1]['reference_latents']), 2)
+        self.assertAlmostEqual(float(clip.calls[0][1]['images'][0].mean()), .2, places=3)
+        self.assertAlmostEqual(float(clip.calls[0][1]['images'][1].mean()), .8, places=3)
+        self.assertIn('camera_image', FisherAnyAngleEncode.INPUT_TYPES()['required'])
+        self.assertIn('vae', FisherAnyAngleEncode.INPUT_TYPES()['required'])
 
 
 if __name__ == '__main__':

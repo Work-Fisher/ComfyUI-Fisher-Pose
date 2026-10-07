@@ -2,7 +2,7 @@
 
 The VNCCS_QI2_PoseStudio LoRA was trained with the mannequin render as image1,
 the character photo as image2 and the fixed instruction below, so this node
-keeps exactly that order and wording instead of our long Chinese edit prompt.
+keeps that order and trigger, followed by explicit single-person identity/pose constraints.
 """
 import json
 
@@ -13,6 +13,7 @@ from .env_check import require_qwen21
 from .pose_reference import reference_image
 
 VNCCS_INSTRUCTION = "Draw character from image2"
+SINGLE_PERSON_INSTRUCTION = VNCCS_INSTRUCTION + "\n" + 'Generate exactly one person. Use image1 only for the body pose and body orientation. Render the person from image2 in that pose, replacing the original pose completely. Preserve the same facial identity, hairstyle, glasses, clothing, garment lengths, footwear and overall appearance from image2. Do not add another person or keep a second copy of the original pose.'
 
 
 def people_sides(pose_json):
@@ -27,20 +28,30 @@ def people_sides(pose_json):
     return ("left", "right") if xs[0] <= xs[1] else ("right", "left")
 
 
-def instruction(pose_json=None):
+def instruction(pose_json=None, reference_mode=None):
     # The LoRA was trained on one person. With two, naming each mannequin by its side and asking for its
     # pose is what made both people follow their poses in testing (2026-09-30); a bare
     # "character from image2 and character from image3" kept both people standing.
     sides = people_sides(pose_json)
     if not sides:
-        return VNCCS_INSTRUCTION
+        return SINGLE_PERSON_INSTRUCTION
     first, second = sides
+    data = json.loads(pose_json or '{}')
+    mode = reference_mode or data.get('referenceMode', 'group')
+    if mode == 'group':
+        # Whole-photo VNCCS binding compensation, observed with the user's paired runs.
+        # UI swapPeople describes the desired identity binding; the model prompt is inverted.
+        source_first, source_second = ('left', 'right') if data.get('swapPeople') else ('right', 'left')
+        return (f"Draw the person on the {source_first} side of the original group photo in image2 in the pose and position of the {first} mannequin in image1, "
+                f"and the person on the {source_second} side of the original group photo in image2 in the pose and position of the {second} mannequin in image1. "
+                "Generate exactly two people, one per mannequin. Preserve each reference person's face, hairstyle, glasses and clothing. "
+                "Replace their original poses completely. Do not duplicate anyone.")
     return (f"Draw the {first} character from image2 in the pose of the {first} mannequin in image1, "
             f"and the {second} character from image3 in the pose of the {second} mannequin in image1.")
 
 
-def free_pose_prompt(extra="", pose_json=None):
-    lines = [instruction(pose_json)] + [line.strip() for line in str(extra or "").splitlines()]
+def free_pose_prompt(extra="", pose_json=None, reference_mode=None):
+    lines = [instruction(pose_json, reference_mode)] + [line.strip() for line in str(extra or "").splitlines()]
     return "\n".join(line for line in lines if line)
 
 
@@ -66,7 +77,7 @@ class FisherPoseImage:
     RETURN_NAMES = ("人偶姿态图", "提示词", "姿势数据")
     FUNCTION = "render"
     CATEGORY = "Fisher/姿态与机位"
-    DESCRIPTION = "只输出人偶姿态图和提示词，不需要 clip / vae，可以接到任何图像编辑工作流里当姿势参考（例如 Qwen Image 2511）。人偶图接 image1、人物图接 image2（两人时第二个人接 image3），提示词会按人数自动写好。"
+    DESCRIPTION = "只输出人偶姿态图和提示词，不需要 clip / vae，可以接到任何图像编辑工作流里当姿势参考（例如 Qwen Image 2511）。人偶图接 image1、完整人物图接 image2（两张单人照模式才将第二张接 image3），提示词会按人数自动写好。"
 
     def render(self, extra_prompt, pose_json, reference_image=None):
         prompt = free_pose_prompt(extra_prompt, pose_json)
@@ -92,7 +103,7 @@ class FisherQwenFreePose:
     RETURN_NAMES = ("正向", "负向", "latent", "实际提示词", "人偶姿态图", "姿势数据")
     FUNCTION = "encode"
     CATEGORY = "Fisher/姿态与机位"
-    DESCRIPTION = "Qwen Image 2.1 自由姿势（1–2 人）。配合 VNCCS_QI2_PoseStudio LoRA：人偶图为 image1、人物图为 image2；编辑器里有两个人时，第二个人的照片接 reference_image_2（image3），提示词自动按左右写好。人偶图尺寸在编辑器里设置；节点 width/height 只决定输出图尺寸，可接分辨率节点，两者无需一致。"
+    DESCRIPTION = "Qwen Image 2.1 自由姿势（1–2 人）。配合 VNCCS_QI2_PoseStudio LoRA：人偶图为 image1、人物图为 image2；两人默认使用完整合照（不裁切）：原图左人绑定人偶1、右人绑定人偶2，可交换对应。两张单人照模式才接 reference_image_2（image3）。人偶图尺寸在编辑器里设置；节点 width/height 只决定输出图尺寸，可接分辨率节点，两者无需一致。"
 
     def encode(self, clip, vae, reference_image, width, height, reference_resolution, extra_prompt, pose_json, reference_image_2=None):
         if width % 16 or height % 16:
@@ -101,15 +112,19 @@ class FisherQwenFreePose:
             if image is not None and (image.ndim != 4 or image.shape[0] != 1):
                 raise ValueError("每个人物图口只接一张图，请不要接入图片批次。")
         two = people_sides(pose_json) is not None
-        if two and reference_image_2 is None:
+        data = json.loads(pose_json or '{}')
+        mode = data.get('referenceMode', 'separate' if reference_image_2 is not None else 'group')
+        if two and mode == 'group' and reference_image_2 is not None:
+            raise ValueError('合照模式只需要 reference_image；请断开 reference_image_2，或在编辑器切换为两张单人照。')
+        if two and mode == 'separate' and reference_image_2 is None:
             raise ValueError("编辑器里有 2 个人：请把人物 2 的照片接到 reference_image_2（对应 image3）。")
         if reference_image_2 is not None and not two:
             raise ValueError("接了 reference_image_2，但编辑器里只有 1 个人：请在编辑器里点「＋ 第二个人」，或断开 reference_image_2。")
         require_qwen21()
         mannequin = mannequin_tensor(pose_json)
-        prompt = free_pose_prompt(extra_prompt, pose_json)
+        prompt = free_pose_prompt(extra_prompt, pose_json, mode)
         images = {"image_1": mannequin, "image_2": reference_image}
-        if two:
+        if two and mode == 'separate':
             images["image_3"] = reference_image_2
         from comfy_extras.nodes_qwen import TextEncodeQwenImage21
         result = TextEncodeQwenImage21.execute(clip=clip, prompt=prompt, negative_prompt="", vae=vae,

@@ -1,0 +1,2292 @@
+{
+ "id": "1bad6502-d6d4-4314-ae63-4c30278933bf",
+ "revision": 0,
+ "last_node_id": 31,
+ "last_link_id": 55,
+ "nodes": [
+  {
+   "id": 1,
+   "type": "UNETLoader",
+   "pos": [
+    50,
+    780
+   ],
+   "size": [
+    330,
+    82
+   ],
+   "flags": {
+    "collapsed": true
+   },
+   "order": 0,
+   "mode": 0,
+   "inputs": [
+    {
+     "localized_name": "UNet名称",
+     "name": "unet_name",
+     "type": "COMBO",
+     "widget": {
+      "name": "unet_name"
+     },
+     "link": null
+    },
+    {
+     "localized_name": "数据类型",
+     "name": "weight_dtype",
+     "type": "COMBO",
+     "widget": {
+      "name": "weight_dtype"
+     },
+     "link": null
+    }
+   ],
+   "outputs": [
+    {
+     "localized_name": "模型",
+     "name": "MODEL",
+     "type": "MODEL",
+     "links": [
+      1,
+      31
+     ]
+    }
+   ],
+   "properties": {
+    "cnr_id": "comfy-core",
+    "ver": "0.36.0",
+    "Node name for S&R": "UNETLoader"
+   },
+   "widgets_values": [
+    "qwen_image_2.1_int8_convrot.safetensors",
+    "default"
+   ],
+   "widgets_values_named": {
+    "unet_name": "qwen_image_2.1_int8_convrot.safetensors",
+    "weight_dtype": "default"
+   }
+  },
+  {
+   "id": 2,
+   "type": "LoraLoaderModelOnly",
+   "pos": [
+    390,
+    780
+   ],
+   "size": [
+    330,
+    82
+   ],
+   "flags": {
+    "collapsed": true
+   },
+   "order": 10,
+   "mode": 0,
+   "inputs": [
+    {
+     "localized_name": "模型",
+     "name": "model",
+     "type": "MODEL",
+     "link": 1
+    },
+    {
+     "localized_name": "LoRA名称",
+     "name": "lora_name",
+     "type": "COMBO",
+     "widget": {
+      "name": "lora_name"
+     },
+     "link": null
+    },
+    {
+     "localized_name": "模型强度",
+     "name": "strength_model",
+     "type": "FLOAT",
+     "widget": {
+      "name": "strength_model"
+     },
+     "link": null
+    }
+   ],
+   "outputs": [
+    {
+     "localized_name": "模型",
+     "name": "MODEL",
+     "type": "MODEL",
+     "links": [
+      2
+     ]
+    }
+   ],
+   "title": "VNCCS PoseStudio QI2.1 LoRA（必需）",
+   "properties": {
+    "cnr_id": "comfy-core",
+    "ver": "0.36.0",
+    "Node name for S&R": "LoraLoaderModelOnly"
+   },
+   "widgets_values": [
+    "VNCCS_QI2_PoseStudioV1.1.safetensors",
+    1
+   ],
+   "widgets_values_named": {
+    "lora_name": "VNCCS_QI2_PoseStudioV1.1.safetensors",
+    "strength_model": 1
+   }
+  },
+  {
+   "id": 3,
+   "type": "CLIPLoader",
+   "pos": [
+    730,
+    780
+   ],
+   "size": [
+    330,
+    106
+   ],
+   "flags": {
+    "collapsed": true
+   },
+   "order": 1,
+   "mode": 0,
+   "inputs": [
+    {
+     "localized_name": "CLIP名称",
+     "name": "clip_name",
+     "type": "COMBO",
+     "widget": {
+      "name": "clip_name"
+     },
+     "link": null
+    },
+    {
+     "localized_name": "类型",
+     "name": "type",
+     "type": "COMBO",
+     "widget": {
+      "name": "type"
+     },
+     "link": null
+    },
+    {
+     "localized_name": "设备",
+     "name": "device",
+     "shape": 7,
+     "type": "COMBO",
+     "widget": {
+      "name": "device"
+     },
+     "link": null
+    }
+   ],
+   "outputs": [
+    {
+     "localized_name": "CLIP",
+     "name": "CLIP",
+     "type": "CLIP",
+     "links": [
+      3,
+      48
+     ]
+    }
+   ],
+   "properties": {
+    "cnr_id": "comfy-core",
+    "ver": "0.36.0",
+    "Node name for S&R": "CLIPLoader"
+   },
+   "widgets_values": [
+    "qwen3vl_8b_bf16.safetensors",
+    "qwen_image",
+    "default"
+   ],
+   "widgets_values_named": {
+    "clip_name": "qwen3vl_8b_bf16.safetensors",
+    "type": "qwen_image",
+    "device": "default"
+   }
+  },
+  {
+   "id": 4,
+   "type": "VAELoader",
+   "pos": [
+    1070,
+    780
+   ],
+   "size": [
+    330,
+    58
+   ],
+   "flags": {
+    "collapsed": true
+   },
+   "order": 2,
+   "mode": 0,
+   "inputs": [
+    {
+     "localized_name": "vae名称",
+     "name": "vae_name",
+     "type": "COMBO",
+     "widget": {
+      "name": "vae_name"
+     },
+     "link": null
+    }
+   ],
+   "outputs": [
+    {
+     "localized_name": "VAE",
+     "name": "VAE",
+     "type": "VAE",
+     "links": [
+      4,
+      10,
+      42,
+      49
+     ]
+    }
+   ],
+   "properties": {
+    "cnr_id": "comfy-core",
+    "ver": "0.36.0",
+    "Node name for S&R": "VAELoader"
+   },
+   "widgets_values": [
+    "qwen_image_2.1_vae_bf16.safetensors"
+   ],
+   "widgets_values_named": {
+    "vae_name": "qwen_image_2.1_vae_bf16.safetensors"
+   }
+  },
+  {
+   "id": 5,
+   "type": "LoadImage",
+   "pos": [
+    50,
+    100
+   ],
+   "size": [
+    320,
+    360
+   ],
+   "flags": {},
+   "order": 3,
+   "mode": 0,
+   "inputs": [
+    {
+     "localized_name": "图像",
+     "name": "image",
+     "type": "COMBO",
+     "widget": {
+      "name": "image"
+     },
+     "link": null
+    },
+    {
+     "localized_name": "选择文件上传",
+     "name": "upload",
+     "type": "IMAGEUPLOAD",
+     "widget": {
+      "name": "upload"
+     },
+     "link": null
+    }
+   ],
+   "outputs": [
+    {
+     "localized_name": "图像",
+     "name": "IMAGE",
+     "type": "IMAGE",
+     "links": [
+      5
+     ]
+    },
+    {
+     "localized_name": "遮罩",
+     "name": "MASK",
+     "type": "MASK",
+     "links": null
+    }
+   ],
+   "title": "1 选择人物照片",
+   "properties": {
+    "cnr_id": "comfy-core",
+    "ver": "0.36.0",
+    "Node name for S&R": "LoadImage"
+   },
+   "widgets_values": [
+    "example.png",
+    "image"
+   ],
+   "widgets_values_named": {
+    "image": "example.png",
+    "upload": "image"
+   }
+  },
+  {
+   "id": 6,
+   "type": "FisherQwenFreePose",
+   "pos": [
+    440,
+    100
+   ],
+   "size": [
+    420,
+    400
+   ],
+   "flags": {},
+   "order": 12,
+   "mode": 0,
+   "inputs": [
+    {
+     "localized_name": "clip",
+     "name": "clip",
+     "type": "CLIP",
+     "link": 3
+    },
+    {
+     "localized_name": "vae",
+     "name": "vae",
+     "type": "VAE",
+     "link": 4
+    },
+    {
+     "localized_name": "reference_image",
+     "name": "reference_image",
+     "type": "IMAGE",
+     "link": 5
+    },
+    {
+     "localized_name": "reference_image_2",
+     "name": "reference_image_2",
+     "shape": 7,
+     "type": "IMAGE",
+     "link": null
+    },
+    {
+     "localized_name": "width",
+     "name": "width",
+     "type": "INT",
+     "widget": {
+      "name": "width"
+     },
+     "link": null
+    },
+    {
+     "localized_name": "height",
+     "name": "height",
+     "type": "INT",
+     "widget": {
+      "name": "height"
+     },
+     "link": null
+    },
+    {
+     "localized_name": "reference_resolution",
+     "name": "reference_resolution",
+     "type": "INT",
+     "widget": {
+      "name": "reference_resolution"
+     },
+     "link": null
+    },
+    {
+     "localized_name": "extra_prompt",
+     "name": "extra_prompt",
+     "type": "STRING",
+     "widget": {
+      "name": "extra_prompt"
+     },
+     "link": null
+    },
+    {
+     "localized_name": "pose_json",
+     "name": "pose_json",
+     "type": "STRING",
+     "widget": {
+      "name": "pose_json"
+     },
+     "link": null
+    }
+   ],
+   "outputs": [
+    {
+     "localized_name": "正向",
+     "name": "正向",
+     "type": "CONDITIONING",
+     "links": [
+      6
+     ]
+    },
+    {
+     "localized_name": "负向",
+     "name": "负向",
+     "type": "CONDITIONING",
+     "links": [
+      7
+     ]
+    },
+    {
+     "localized_name": "latent",
+     "name": "latent",
+     "type": "LATENT",
+     "links": [
+      8
+     ]
+    },
+    {
+     "localized_name": "实际提示词",
+     "name": "实际提示词",
+     "type": "STRING",
+     "links": null
+    },
+    {
+     "localized_name": "人偶姿态图",
+     "name": "人偶姿态图",
+     "type": "IMAGE",
+     "links": null
+    },
+    {
+     "localized_name": "姿势数据",
+     "name": "姿势数据",
+     "type": "STRING",
+     "links": [
+      52
+     ]
+    }
+   ],
+   "title": "2 编辑姿势与镜头",
+   "properties": {
+    "aux_id": "Work-Fisher/ComfyUI-Fisher-Pose",
+    "ver": "f9505b2385bccb168304c1c4d9987ef9e3df37bb",
+    "Node name for S&R": "FisherQwenFreePose"
+   },
+   "widgets_values": [
+    1024,
+    1024,
+    1024,
+    "",
+    "{}",
+    null
+   ],
+   "widgets_values_named": {
+    "width": 1024,
+    "height": 1024,
+    "reference_resolution": 1024,
+    "extra_prompt": "",
+    "pose_json": "{}",
+    "编辑姿势与镜头": null
+   }
+  },
+  {
+   "id": 7,
+   "type": "KSampler",
+   "pos": [
+    50,
+    890
+   ],
+   "size": [
+    320,
+    262
+   ],
+   "flags": {
+    "collapsed": true
+   },
+   "order": 13,
+   "mode": 0,
+   "inputs": [
+    {
+     "localized_name": "模型",
+     "name": "model",
+     "type": "MODEL",
+     "link": 2
+    },
+    {
+     "localized_name": "正面条件",
+     "name": "positive",
+     "type": "CONDITIONING",
+     "link": 6
+    },
+    {
+     "localized_name": "负面条件",
+     "name": "negative",
+     "type": "CONDITIONING",
+     "link": 7
+    },
+    {
+     "localized_name": "Latent图像",
+     "name": "latent_image",
+     "type": "LATENT",
+     "link": 8
+    },
+    {
+     "localized_name": "种子",
+     "name": "seed",
+     "type": "INT",
+     "widget": {
+      "name": "seed"
+     },
+     "link": null
+    },
+    {
+     "localized_name": "步数",
+     "name": "steps",
+     "type": "INT",
+     "widget": {
+      "name": "steps"
+     },
+     "link": null
+    },
+    {
+     "localized_name": "cfg",
+     "name": "cfg",
+     "type": "FLOAT",
+     "widget": {
+      "name": "cfg"
+     },
+     "link": null
+    },
+    {
+     "localized_name": "采样器名称",
+     "name": "sampler_name",
+     "type": "COMBO",
+     "widget": {
+      "name": "sampler_name"
+     },
+     "link": null
+    },
+    {
+     "localized_name": "调度器",
+     "name": "scheduler",
+     "type": "COMBO",
+     "widget": {
+      "name": "scheduler"
+     },
+     "link": null
+    },
+    {
+     "localized_name": "降噪",
+     "name": "denoise",
+     "type": "FLOAT",
+     "widget": {
+      "name": "denoise"
+     },
+     "link": null
+    }
+   ],
+   "outputs": [
+    {
+     "localized_name": "Latent",
+     "name": "LATENT",
+     "type": "LATENT",
+     "links": [
+      9
+     ]
+    }
+   ],
+   "properties": {
+    "cnr_id": "comfy-core",
+    "ver": "0.36.0",
+    "Node name for S&R": "KSampler"
+   },
+   "widgets_values": [
+    20260930,
+    "fixed",
+    25,
+    1,
+    "euler",
+    "simple",
+    1
+   ],
+   "widgets_values_named": {
+    "seed": 20260930,
+    "control_after_generate": "fixed",
+    "steps": 25,
+    "cfg": 1,
+    "sampler_name": "euler",
+    "scheduler": "simple",
+    "denoise": 1
+   }
+  },
+  {
+   "id": 8,
+   "type": "VAEDecode",
+   "pos": [
+    390,
+    890
+   ],
+   "size": [
+    210,
+    46
+   ],
+   "flags": {
+    "collapsed": true
+   },
+   "order": 15,
+   "mode": 0,
+   "inputs": [
+    {
+     "localized_name": "Latent",
+     "name": "samples",
+     "type": "LATENT",
+     "link": 9
+    },
+    {
+     "localized_name": "vae",
+     "name": "vae",
+     "type": "VAE",
+     "link": 10
+    }
+   ],
+   "outputs": [
+    {
+     "localized_name": "图像",
+     "name": "IMAGE",
+     "type": "IMAGE",
+     "links": [
+      15,
+      16,
+      29,
+      45,
+      50,
+      55
+     ]
+    }
+   ],
+   "properties": {
+    "cnr_id": "comfy-core",
+    "ver": "0.36.0",
+    "Node name for S&R": "VAEDecode"
+   }
+  },
+  {
+   "id": 12,
+   "type": "LoadBackgroundRemovalModel",
+   "pos": [
+    730,
+    890
+   ],
+   "size": [
+    270,
+    58
+   ],
+   "flags": {
+    "collapsed": true
+   },
+   "order": 4,
+   "mode": 2,
+   "inputs": [
+    {
+     "localized_name": "背景移除模型名称",
+     "name": "bg_removal_name",
+     "type": "COMBO",
+     "widget": {
+      "name": "bg_removal_name"
+     },
+     "link": null
+    }
+   ],
+   "outputs": [
+    {
+     "localized_name": "bg_model",
+     "name": "bg_model",
+     "type": "BACKGROUND_REMOVAL",
+     "links": [
+      14
+     ]
+    }
+   ],
+   "properties": {
+    "cnr_id": "comfy-core",
+    "ver": "0.36.0",
+    "Node name for S&R": "LoadBackgroundRemovalModel"
+   },
+   "widgets_values": [
+    "birefnet.safetensors"
+   ],
+   "widgets_values_named": {
+    "bg_removal_name": "birefnet.safetensors"
+   }
+  },
+  {
+   "id": 13,
+   "type": "RemoveBackground",
+   "pos": [
+    1070,
+    890
+   ],
+   "size": [
+    147.169921875,
+    46
+   ],
+   "flags": {
+    "collapsed": true
+   },
+   "order": 16,
+   "mode": 2,
+   "inputs": [
+    {
+     "localized_name": "背景移除模型",
+     "name": "bg_removal_model",
+     "type": "BACKGROUND_REMOVAL",
+     "link": 14
+    },
+    {
+     "localized_name": "图像",
+     "name": "image",
+     "type": "IMAGE",
+     "link": 15
+    }
+   ],
+   "outputs": [
+    {
+     "localized_name": "mask",
+     "name": "mask",
+     "type": "MASK",
+     "links": [
+      17
+     ]
+    }
+   ],
+   "properties": {
+    "cnr_id": "comfy-core",
+    "ver": "0.36.0",
+    "Node name for S&R": "RemoveBackground"
+   }
+  },
+  {
+   "id": 14,
+   "type": "TripoSplatPreprocessImage",
+   "pos": [
+    50,
+    1000
+   ],
+   "size": [
+    270,
+    102
+   ],
+   "flags": {
+    "collapsed": true
+   },
+   "order": 17,
+   "mode": 2,
+   "inputs": [
+    {
+     "localized_name": "image",
+     "name": "image",
+     "type": "IMAGE",
+     "link": 16
+    },
+    {
+     "localized_name": "mask",
+     "name": "mask",
+     "type": "MASK",
+     "link": 17
+    },
+    {
+     "localized_name": "erode_radius",
+     "name": "erode_radius",
+     "type": "INT",
+     "widget": {
+      "name": "erode_radius"
+     },
+     "link": null
+    },
+    {
+     "localized_name": "size",
+     "name": "size",
+     "type": "INT",
+     "widget": {
+      "name": "size"
+     },
+     "link": null
+    }
+   ],
+   "outputs": [
+    {
+     "localized_name": "image",
+     "name": "image",
+     "type": "IMAGE",
+     "links": [
+      20
+     ]
+    }
+   ],
+   "properties": {
+    "cnr_id": "comfy-core",
+    "ver": "0.36.0",
+    "Node name for S&R": "TripoSplatPreprocessImage"
+   },
+   "widgets_values": [
+    1,
+    1024
+   ],
+   "widgets_values_named": {
+    "erode_radius": 1,
+    "size": 1024
+   }
+  },
+  {
+   "id": 15,
+   "type": "CLIPVisionLoader",
+   "pos": [
+    390,
+    1000
+   ],
+   "size": [
+    270,
+    58
+   ],
+   "flags": {
+    "collapsed": true
+   },
+   "order": 5,
+   "mode": 2,
+   "inputs": [
+    {
+     "localized_name": "clip名称",
+     "name": "clip_name",
+     "type": "COMBO",
+     "widget": {
+      "name": "clip_name"
+     },
+     "link": null
+    }
+   ],
+   "outputs": [
+    {
+     "localized_name": "CLIP视觉",
+     "name": "CLIP_VISION",
+     "type": "CLIP_VISION",
+     "links": [
+      18
+     ]
+    }
+   ],
+   "properties": {
+    "cnr_id": "comfy-core",
+    "ver": "0.36.0",
+    "Node name for S&R": "CLIPVisionLoader"
+   },
+   "widgets_values": [
+    "dino_v3_vit_h.safetensors"
+   ],
+   "widgets_values_named": {
+    "clip_name": "dino_v3_vit_h.safetensors"
+   }
+  },
+  {
+   "id": 16,
+   "type": "VAELoader",
+   "pos": [
+    730,
+    1000
+   ],
+   "size": [
+    270,
+    58
+   ],
+   "flags": {
+    "collapsed": true
+   },
+   "order": 6,
+   "mode": 2,
+   "inputs": [
+    {
+     "localized_name": "vae名称",
+     "name": "vae_name",
+     "type": "COMBO",
+     "widget": {
+      "name": "vae_name"
+     },
+     "link": null
+    }
+   ],
+   "outputs": [
+    {
+     "localized_name": "VAE",
+     "name": "VAE",
+     "type": "VAE",
+     "links": [
+      19
+     ]
+    }
+   ],
+   "title": "Flux2 VAE（TripoSplat 用）",
+   "properties": {
+    "cnr_id": "comfy-core",
+    "ver": "0.36.0",
+    "Node name for S&R": "VAELoader"
+   },
+   "widgets_values": [
+    "flux2-vae.safetensors"
+   ],
+   "widgets_values_named": {
+    "vae_name": "flux2-vae.safetensors"
+   }
+  },
+  {
+   "id": 17,
+   "type": "TripoSplatConditioning",
+   "pos": [
+    1070,
+    1000
+   ],
+   "size": [
+    167.2330078125,
+    66
+   ],
+   "flags": {
+    "collapsed": true
+   },
+   "order": 18,
+   "mode": 2,
+   "inputs": [
+    {
+     "localized_name": "clip_vision",
+     "name": "clip_vision",
+     "type": "CLIP_VISION",
+     "link": 18
+    },
+    {
+     "localized_name": "vae",
+     "name": "vae",
+     "type": "VAE",
+     "link": 19
+    },
+    {
+     "localized_name": "图像",
+     "name": "image",
+     "type": "IMAGE",
+     "link": 20
+    }
+   ],
+   "outputs": [
+    {
+     "localized_name": "正向条件",
+     "name": "positive",
+     "type": "CONDITIONING",
+     "links": [
+      22
+     ]
+    },
+    {
+     "localized_name": "负向条件",
+     "name": "negative",
+     "type": "CONDITIONING",
+     "links": [
+      23
+     ]
+    },
+    {
+     "localized_name": "latent",
+     "name": "latent",
+     "type": "LATENT",
+     "links": [
+      24
+     ]
+    }
+   ],
+   "properties": {
+    "cnr_id": "comfy-core",
+    "ver": "0.36.0",
+    "Node name for S&R": "TripoSplatConditioning"
+   }
+  },
+  {
+   "id": 18,
+   "type": "UNETLoader",
+   "pos": [
+    50,
+    1110
+   ],
+   "size": [
+    270,
+    82
+   ],
+   "flags": {
+    "collapsed": true
+   },
+   "order": 7,
+   "mode": 2,
+   "inputs": [
+    {
+     "localized_name": "UNet名称",
+     "name": "unet_name",
+     "type": "COMBO",
+     "widget": {
+      "name": "unet_name"
+     },
+     "link": null
+    },
+    {
+     "localized_name": "数据类型",
+     "name": "weight_dtype",
+     "type": "COMBO",
+     "widget": {
+      "name": "weight_dtype"
+     },
+     "link": null
+    }
+   ],
+   "outputs": [
+    {
+     "localized_name": "模型",
+     "name": "MODEL",
+     "type": "MODEL",
+     "links": [
+      21
+     ]
+    }
+   ],
+   "title": "TripoSplat 模型",
+   "properties": {
+    "cnr_id": "comfy-core",
+    "ver": "0.36.0",
+    "Node name for S&R": "UNETLoader"
+   },
+   "widgets_values": [
+    "triposplat_fp16.safetensors",
+    "default"
+   ],
+   "widgets_values_named": {
+    "unet_name": "triposplat_fp16.safetensors",
+    "weight_dtype": "default"
+   }
+  },
+  {
+   "id": 19,
+   "type": "KSampler",
+   "pos": [
+    390,
+    1110
+   ],
+   "size": [
+    270,
+    262
+   ],
+   "flags": {
+    "collapsed": true
+   },
+   "order": 19,
+   "mode": 2,
+   "inputs": [
+    {
+     "localized_name": "模型",
+     "name": "model",
+     "type": "MODEL",
+     "link": 21
+    },
+    {
+     "localized_name": "正面条件",
+     "name": "positive",
+     "type": "CONDITIONING",
+     "link": 22
+    },
+    {
+     "localized_name": "负面条件",
+     "name": "negative",
+     "type": "CONDITIONING",
+     "link": 23
+    },
+    {
+     "localized_name": "Latent图像",
+     "name": "latent_image",
+     "type": "LATENT",
+     "link": 24
+    },
+    {
+     "localized_name": "种子",
+     "name": "seed",
+     "type": "INT",
+     "widget": {
+      "name": "seed"
+     },
+     "link": null
+    },
+    {
+     "localized_name": "步数",
+     "name": "steps",
+     "type": "INT",
+     "widget": {
+      "name": "steps"
+     },
+     "link": null
+    },
+    {
+     "localized_name": "cfg",
+     "name": "cfg",
+     "type": "FLOAT",
+     "widget": {
+      "name": "cfg"
+     },
+     "link": null
+    },
+    {
+     "localized_name": "采样器名称",
+     "name": "sampler_name",
+     "type": "COMBO",
+     "widget": {
+      "name": "sampler_name"
+     },
+     "link": null
+    },
+    {
+     "localized_name": "调度器",
+     "name": "scheduler",
+     "type": "COMBO",
+     "widget": {
+      "name": "scheduler"
+     },
+     "link": null
+    },
+    {
+     "localized_name": "降噪",
+     "name": "denoise",
+     "type": "FLOAT",
+     "widget": {
+      "name": "denoise"
+     },
+     "link": null
+    }
+   ],
+   "outputs": [
+    {
+     "localized_name": "Latent",
+     "name": "LATENT",
+     "type": "LATENT",
+     "links": [
+      25
+     ]
+    }
+   ],
+   "title": "KSampler（生成 3D）",
+   "properties": {
+    "cnr_id": "comfy-core",
+    "ver": "0.36.0",
+    "Node name for S&R": "KSampler"
+   },
+   "widgets_values": [
+    46,
+    "fixed",
+    20,
+    3,
+    "dpmpp_2m",
+    "simple",
+    1
+   ],
+   "widgets_values_named": {
+    "seed": 46,
+    "control_after_generate": "fixed",
+    "steps": 20,
+    "cfg": 3,
+    "sampler_name": "dpmpp_2m",
+    "scheduler": "simple",
+    "denoise": 1
+   }
+  },
+  {
+   "id": 20,
+   "type": "VAELoader",
+   "pos": [
+    730,
+    1110
+   ],
+   "size": [
+    270,
+    58
+   ],
+   "flags": {
+    "collapsed": true
+   },
+   "order": 8,
+   "mode": 2,
+   "inputs": [
+    {
+     "localized_name": "vae名称",
+     "name": "vae_name",
+     "type": "COMBO",
+     "widget": {
+      "name": "vae_name"
+     },
+     "link": null
+    }
+   ],
+   "outputs": [
+    {
+     "localized_name": "VAE",
+     "name": "VAE",
+     "type": "VAE",
+     "links": [
+      26
+     ]
+    }
+   ],
+   "title": "TripoSplat 解码器",
+   "properties": {
+    "cnr_id": "comfy-core",
+    "ver": "0.36.0",
+    "Node name for S&R": "VAELoader"
+   },
+   "widgets_values": [
+    "triposplat_vae_decoder_fp16.safetensors"
+   ],
+   "widgets_values_named": {
+    "vae_name": "triposplat_vae_decoder_fp16.safetensors"
+   }
+  },
+  {
+   "id": 21,
+   "type": "VAEDecodeTripoSplat",
+   "pos": [
+    1070,
+    1110
+   ],
+   "size": [
+    270,
+    126
+   ],
+   "flags": {
+    "collapsed": true
+   },
+   "order": 20,
+   "mode": 2,
+   "inputs": [
+    {
+     "localized_name": "samples",
+     "name": "samples",
+     "type": "LATENT",
+     "link": 25
+    },
+    {
+     "localized_name": "vae",
+     "name": "vae",
+     "type": "VAE",
+     "link": 26
+    },
+    {
+     "localized_name": "num_gaussians",
+     "name": "num_gaussians",
+     "type": "INT",
+     "widget": {
+      "name": "num_gaussians"
+     },
+     "link": null
+    },
+    {
+     "localized_name": "seed",
+     "name": "seed",
+     "type": "INT",
+     "widget": {
+      "name": "seed"
+     },
+     "link": null
+    }
+   ],
+   "outputs": [
+    {
+     "localized_name": "splat",
+     "name": "splat",
+     "type": "SPLAT",
+     "links": [
+      27
+     ]
+    }
+   ],
+   "properties": {
+    "cnr_id": "comfy-core",
+    "ver": "0.36.0",
+    "Node name for S&R": "VAEDecodeTripoSplat"
+   },
+   "widgets_values": [
+    262144,
+    0,
+    "fixed"
+   ],
+   "widgets_values_named": {
+    "num_gaussians": 262144,
+    "seed": 0,
+    "control_after_generate": "fixed"
+   }
+  },
+  {
+   "id": 22,
+   "type": "FisherAnyAngleCamera",
+   "pos": [
+    50,
+    1220
+   ],
+   "size": [
+    263.24375,
+    66
+   ],
+   "flags": {
+    "collapsed": true
+   },
+   "order": 21,
+   "mode": 2,
+   "inputs": [
+    {
+     "localized_name": "splat",
+     "name": "splat",
+     "type": "SPLAT",
+     "link": 27
+    },
+    {
+     "localized_name": "pose_json",
+     "name": "pose_json",
+     "type": "STRING",
+     "link": 53
+    },
+    {
+     "localized_name": "image",
+     "name": "image",
+     "type": "IMAGE",
+     "link": 29
+    }
+   ],
+   "outputs": [
+    {
+     "localized_name": "粗渲染",
+     "name": "粗渲染",
+     "type": "IMAGE",
+     "links": [
+      51
+     ]
+    },
+    {
+     "localized_name": "AnyAngle提示词",
+     "name": "AnyAngle提示词",
+     "type": "STRING",
+     "links": null
+    },
+    {
+     "localized_name": "camera_info",
+     "name": "camera_info",
+     "type": "LOAD3D_CAMERA",
+     "links": null
+    }
+   ],
+   "title": "Fisher AnyAngle 机位（出粗渲染）",
+   "properties": {
+    "aux_id": "Work-Fisher/ComfyUI-Fisher-Pose",
+    "ver": "f9505b2385bccb168304c1c4d9987ef9e3df37bb",
+    "Node name for S&R": "FisherAnyAngleCamera"
+   }
+  },
+  {
+   "id": 24,
+   "type": "LoraLoaderModelOnly",
+   "pos": [
+    390,
+    1220
+   ],
+   "size": [
+    270,
+    82
+   ],
+   "flags": {
+    "collapsed": true
+   },
+   "order": 11,
+   "mode": 2,
+   "inputs": [
+    {
+     "localized_name": "模型",
+     "name": "model",
+     "type": "MODEL",
+     "link": 31
+    },
+    {
+     "localized_name": "LoRA名称",
+     "name": "lora_name",
+     "type": "COMBO",
+     "widget": {
+      "name": "lora_name"
+     },
+     "link": null
+    },
+    {
+     "localized_name": "模型强度",
+     "name": "strength_model",
+     "type": "FLOAT",
+     "widget": {
+      "name": "strength_model"
+     },
+     "link": null
+    }
+   ],
+   "outputs": [
+    {
+     "localized_name": "模型",
+     "name": "MODEL",
+     "type": "MODEL",
+     "links": [
+      37
+     ]
+    }
+   ],
+   "title": "AnyAngle LoRA",
+   "properties": {
+    "cnr_id": "comfy-core",
+    "ver": "0.36.0",
+    "Node name for S&R": "LoraLoaderModelOnly"
+   },
+   "widgets_values": [
+    "QI2.1_AnyAngle.safetensors",
+    1
+   ],
+   "widgets_values_named": {
+    "lora_name": "QI2.1_AnyAngle.safetensors",
+    "strength_model": 1
+   }
+  },
+  {
+   "id": 25,
+   "type": "FisherAnyAngleEncode",
+   "pos": [
+    730,
+    1220
+   ],
+   "size": [
+    400,
+    246
+   ],
+   "flags": {
+    "collapsed": true
+   },
+   "order": 22,
+   "mode": 2,
+   "inputs": [
+    {
+     "localized_name": "clip",
+     "name": "clip",
+     "type": "CLIP",
+     "link": 48
+    },
+    {
+     "localized_name": "vae",
+     "name": "vae",
+     "type": "VAE",
+     "link": 49
+    },
+    {
+     "localized_name": "front_image",
+     "name": "front_image",
+     "type": "IMAGE",
+     "link": 50
+    },
+    {
+     "localized_name": "camera_image",
+     "name": "camera_image",
+     "type": "IMAGE",
+     "link": 51
+    },
+    {
+     "localized_name": "resolution",
+     "name": "resolution",
+     "type": "INT",
+     "widget": {
+      "name": "resolution"
+     },
+     "link": null
+    }
+   ],
+   "outputs": [
+    {
+     "localized_name": "正向",
+     "name": "正向",
+     "type": "CONDITIONING",
+     "links": [
+      38
+     ]
+    },
+    {
+     "localized_name": "负向",
+     "name": "负向",
+     "type": "CONDITIONING",
+     "links": [
+      39
+     ]
+    },
+    {
+     "localized_name": "latent",
+     "name": "latent",
+     "type": "LATENT",
+     "links": [
+      40
+     ]
+    }
+   ],
+   "properties": {
+    "aux_id": "Work-Fisher/ComfyUI-Fisher-Pose",
+    "ver": "93f20bc7a77533da57bec685a0974f81c3f814b1",
+    "Node name for S&R": "FisherAnyAngleEncode"
+   },
+   "widgets_values": [
+    0
+   ],
+   "widgets_values_named": {
+    "resolution": 0
+   }
+  },
+  {
+   "id": 26,
+   "type": "KSampler",
+   "pos": [
+    1070,
+    1220
+   ],
+   "size": [
+    270,
+    262
+   ],
+   "flags": {
+    "collapsed": true
+   },
+   "order": 23,
+   "mode": 2,
+   "inputs": [
+    {
+     "localized_name": "模型",
+     "name": "model",
+     "type": "MODEL",
+     "link": 37
+    },
+    {
+     "localized_name": "正面条件",
+     "name": "positive",
+     "type": "CONDITIONING",
+     "link": 38
+    },
+    {
+     "localized_name": "负面条件",
+     "name": "negative",
+     "type": "CONDITIONING",
+     "link": 39
+    },
+    {
+     "localized_name": "Latent图像",
+     "name": "latent_image",
+     "type": "LATENT",
+     "link": 40
+    },
+    {
+     "localized_name": "种子",
+     "name": "seed",
+     "type": "INT",
+     "widget": {
+      "name": "seed"
+     },
+     "link": null
+    },
+    {
+     "localized_name": "步数",
+     "name": "steps",
+     "type": "INT",
+     "widget": {
+      "name": "steps"
+     },
+     "link": null
+    },
+    {
+     "localized_name": "cfg",
+     "name": "cfg",
+     "type": "FLOAT",
+     "widget": {
+      "name": "cfg"
+     },
+     "link": null
+    },
+    {
+     "localized_name": "采样器名称",
+     "name": "sampler_name",
+     "type": "COMBO",
+     "widget": {
+      "name": "sampler_name"
+     },
+     "link": null
+    },
+    {
+     "localized_name": "调度器",
+     "name": "scheduler",
+     "type": "COMBO",
+     "widget": {
+      "name": "scheduler"
+     },
+     "link": null
+    },
+    {
+     "localized_name": "降噪",
+     "name": "denoise",
+     "type": "FLOAT",
+     "widget": {
+      "name": "denoise"
+     },
+     "link": null
+    }
+   ],
+   "outputs": [
+    {
+     "localized_name": "Latent",
+     "name": "LATENT",
+     "type": "LATENT",
+     "links": [
+      41
+     ]
+    }
+   ],
+   "title": "KSampler（换机位）",
+   "properties": {
+    "cnr_id": "comfy-core",
+    "ver": "0.36.0",
+    "Node name for S&R": "KSampler"
+   },
+   "widgets_values": [
+    42,
+    "fixed",
+    25,
+    1,
+    "euler",
+    "simple",
+    1
+   ],
+   "widgets_values_named": {
+    "seed": 42,
+    "control_after_generate": "fixed",
+    "steps": 25,
+    "cfg": 1,
+    "sampler_name": "euler",
+    "scheduler": "simple",
+    "denoise": 1
+   }
+  },
+  {
+   "id": 27,
+   "type": "VAEDecode",
+   "pos": [
+    50,
+    1330
+   ],
+   "size": [
+    140,
+    46
+   ],
+   "flags": {
+    "collapsed": true
+   },
+   "order": 24,
+   "mode": 2,
+   "inputs": [
+    {
+     "localized_name": "Latent",
+     "name": "samples",
+     "type": "LATENT",
+     "link": 41
+    },
+    {
+     "localized_name": "vae",
+     "name": "vae",
+     "type": "VAE",
+     "link": 42
+    }
+   ],
+   "outputs": [
+    {
+     "localized_name": "图像",
+     "name": "IMAGE",
+     "type": "IMAGE",
+     "links": [
+      46
+     ]
+    }
+   ],
+   "properties": {
+    "cnr_id": "comfy-core",
+    "ver": "0.36.0",
+    "Node name for S&R": "VAEDecode"
+   }
+  },
+  {
+   "id": 28,
+   "type": "SaveImage",
+   "pos": [
+    940,
+    100
+   ],
+   "size": [
+    420,
+    440
+   ],
+   "flags": {},
+   "order": 26,
+   "mode": 0,
+   "inputs": [
+    {
+     "localized_name": "图片",
+     "name": "images",
+     "type": "IMAGE",
+     "link": 47
+    },
+    {
+     "localized_name": "文件名前缀",
+     "name": "filename_prefix",
+     "type": "STRING",
+     "widget": {
+      "name": "filename_prefix"
+     },
+     "link": null
+    }
+   ],
+   "outputs": [
+    {
+     "localized_name": "images",
+     "name": "images",
+     "type": "IMAGE",
+     "links": null
+    }
+   ],
+   "title": "3 最终图像",
+   "properties": {
+    "cnr_id": "comfy-core",
+    "ver": "0.36.0",
+    "Node name for S&R": "SaveImage"
+   },
+   "widgets_values": [
+    "Fisher-Pose/%date:yyyyMMdd_hhmmss%"
+   ],
+   "widgets_values_named": {
+    "filename_prefix": "Fisher-Pose/%date:yyyyMMdd_hhmmss%"
+   }
+  },
+  {
+   "id": 29,
+   "type": "FisherPoseResult",
+   "pos": [
+    390,
+    1330
+   ],
+   "size": [
+    260,
+    106
+   ],
+   "flags": {
+    "collapsed": true
+   },
+   "order": 25,
+   "mode": 0,
+   "inputs": [
+    {
+     "localized_name": "pose_json",
+     "name": "pose_json",
+     "type": "STRING",
+     "link": 54
+    },
+    {
+     "localized_name": "front_image",
+     "name": "front_image",
+     "type": "IMAGE",
+     "link": 45
+    },
+    {
+     "localized_name": "camera_image",
+     "name": "camera_image",
+     "shape": 7,
+     "type": "IMAGE",
+     "link": 46
+    }
+   ],
+   "outputs": [
+    {
+     "localized_name": "最终图像",
+     "name": "最终图像",
+     "type": "IMAGE",
+     "slot_index": 0,
+     "links": [
+      47
+     ]
+    }
+   ],
+   "title": "自动选择最终结果",
+   "properties": {
+    "aux_id": "Work-Fisher/ComfyUI-Fisher-Pose",
+    "ver": "93f20bc7a77533da57bec685a0974f81c3f814b1",
+    "Node name for S&R": "FisherPoseResult"
+   }
+  },
+  {
+   "id": 30,
+   "type": "FisherShot",
+   "pos": [
+    50,
+    1480
+   ],
+   "size": [
+    400,
+    200
+   ],
+   "flags": {},
+   "order": 14,
+   "mode": 0,
+   "inputs": [
+    {
+     "localized_name": "pose_json",
+     "name": "pose_json",
+     "type": "STRING",
+     "link": 52
+    },
+    {
+     "localized_name": "shot_json",
+     "name": "shot_json",
+     "type": "STRING",
+     "widget": {
+      "name": "shot_json"
+     },
+     "link": null
+    }
+   ],
+   "outputs": [
+    {
+     "localized_name": "姿势与镜头",
+     "name": "姿势与镜头",
+     "type": "STRING",
+     "links": [
+      53,
+      54
+     ]
+    }
+   ],
+   "title": "Fisher 镜头（编辑器自动写入）",
+   "properties": {
+    "aux_id": "Work-Fisher/ComfyUI-Fisher-Pose",
+    "ver": "93f20bc7a77533da57bec685a0974f81c3f814b1",
+    "Node name for S&R": "FisherShot"
+   },
+   "widgets_values": [
+    "{}"
+   ],
+   "widgets_values_named": {
+    "shot_json": "{}"
+   }
+  },
+  {
+   "id": 31,
+   "type": "PreviewImage",
+   "pos": [
+    390,
+    1030
+   ],
+   "size": [
+    140,
+    26
+   ],
+   "flags": {},
+   "order": 9,
+   "mode": 0,
+   "inputs": [
+    {
+     "localized_name": "图像",
+     "name": "images",
+     "type": "IMAGE",
+     "link": 55
+    }
+   ],
+   "outputs": [
+    {
+     "localized_name": "images",
+     "name": "images",
+     "type": "IMAGE",
+     "links": null
+    }
+   ],
+   "title": "正面结果",
+   "properties": {
+    "cnr_id": "comfy-core",
+    "ver": "0.36.0",
+    "Node name for S&R": "PreviewImage"
+   }
+  }
+ ],
+ "links": [
+  [
+   1,
+   1,
+   0,
+   2,
+   0,
+   "MODEL"
+  ],
+  [
+   2,
+   2,
+   0,
+   7,
+   0,
+   "MODEL"
+  ],
+  [
+   3,
+   3,
+   0,
+   6,
+   0,
+   "CLIP"
+  ],
+  [
+   4,
+   4,
+   0,
+   6,
+   1,
+   "VAE"
+  ],
+  [
+   5,
+   5,
+   0,
+   6,
+   2,
+   "IMAGE"
+  ],
+  [
+   6,
+   6,
+   0,
+   7,
+   1,
+   "CONDITIONING"
+  ],
+  [
+   7,
+   6,
+   1,
+   7,
+   2,
+   "CONDITIONING"
+  ],
+  [
+   8,
+   6,
+   2,
+   7,
+   3,
+   "LATENT"
+  ],
+  [
+   9,
+   7,
+   0,
+   8,
+   0,
+   "LATENT"
+  ],
+  [
+   10,
+   4,
+   0,
+   8,
+   1,
+   "VAE"
+  ],
+  [
+   14,
+   12,
+   0,
+   13,
+   0,
+   "BACKGROUND_REMOVAL"
+  ],
+  [
+   15,
+   8,
+   0,
+   13,
+   1,
+   "IMAGE"
+  ],
+  [
+   16,
+   8,
+   0,
+   14,
+   0,
+   "IMAGE"
+  ],
+  [
+   17,
+   13,
+   0,
+   14,
+   1,
+   "MASK"
+  ],
+  [
+   18,
+   15,
+   0,
+   17,
+   0,
+   "CLIP_VISION"
+  ],
+  [
+   19,
+   16,
+   0,
+   17,
+   1,
+   "VAE"
+  ],
+  [
+   20,
+   14,
+   0,
+   17,
+   2,
+   "IMAGE"
+  ],
+  [
+   21,
+   18,
+   0,
+   19,
+   0,
+   "MODEL"
+  ],
+  [
+   22,
+   17,
+   0,
+   19,
+   1,
+   "CONDITIONING"
+  ],
+  [
+   23,
+   17,
+   1,
+   19,
+   2,
+   "CONDITIONING"
+  ],
+  [
+   24,
+   17,
+   2,
+   19,
+   3,
+   "LATENT"
+  ],
+  [
+   25,
+   19,
+   0,
+   21,
+   0,
+   "LATENT"
+  ],
+  [
+   26,
+   20,
+   0,
+   21,
+   1,
+   "VAE"
+  ],
+  [
+   27,
+   21,
+   0,
+   22,
+   0,
+   "SPLAT"
+  ],
+  [
+   29,
+   8,
+   0,
+   22,
+   2,
+   "IMAGE"
+  ],
+  [
+   31,
+   1,
+   0,
+   24,
+   0,
+   "MODEL"
+  ],
+  [
+   37,
+   24,
+   0,
+   26,
+   0,
+   "MODEL"
+  ],
+  [
+   38,
+   25,
+   0,
+   26,
+   1,
+   "CONDITIONING"
+  ],
+  [
+   39,
+   25,
+   1,
+   26,
+   2,
+   "CONDITIONING"
+  ],
+  [
+   40,
+   25,
+   2,
+   26,
+   3,
+   "LATENT"
+  ],
+  [
+   41,
+   26,
+   0,
+   27,
+   0,
+   "LATENT"
+  ],
+  [
+   42,
+   4,
+   0,
+   27,
+   1,
+   "VAE"
+  ],
+  [
+   45,
+   8,
+   0,
+   29,
+   1,
+   "IMAGE"
+  ],
+  [
+   46,
+   27,
+   0,
+   29,
+   2,
+   "IMAGE"
+  ],
+  [
+   47,
+   29,
+   0,
+   28,
+   0,
+   "IMAGE"
+  ],
+  [
+   48,
+   3,
+   0,
+   25,
+   0,
+   "CLIP"
+  ],
+  [
+   49,
+   4,
+   0,
+   25,
+   1,
+   "VAE"
+  ],
+  [
+   50,
+   8,
+   0,
+   25,
+   2,
+   "IMAGE"
+  ],
+  [
+   51,
+   22,
+   0,
+   25,
+   3,
+   "IMAGE"
+  ],
+  [
+   52,
+   6,
+   5,
+   30,
+   0,
+   "STRING"
+  ],
+  [
+   53,
+   30,
+   0,
+   22,
+   1,
+   "STRING"
+  ],
+  [
+   54,
+   30,
+   0,
+   29,
+   0,
+   "STRING"
+  ],
+  [
+   55,
+   8,
+   0,
+   31,
+   0,
+   "IMAGE"
+  ]
+ ],
+ "groups": [
+  {
+   "id": 1,
+   "title": "选照片 → 编辑姿势与镜头 → 生成",
+   "bounding": [
+    25,
+    35,
+    1360,
+    570
+   ],
+   "color": "#315acd",
+   "flags": {}
+  },
+  {
+   "id": 2,
+   "title": "自动处理区 · 通常无需调整",
+   "bounding": [
+    25,
+    690,
+    1360,
+    780
+   ],
+   "color": "#718198",
+   "flags": {}
+  }
+ ],
+ "config": {},
+ "extra": {
+  "ds": {
+   "scale": 0.45,
+   "offset": [
+    1228.888888888889,
+    -454.1111111111111
+   ]
+  }
+ },
+ "version": 0.4
+}

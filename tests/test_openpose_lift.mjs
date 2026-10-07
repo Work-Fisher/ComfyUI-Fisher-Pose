@@ -41,3 +41,13 @@ const front = toImage(rest);
 }
 
 console.log('openpose-lift: all tests passed');
+
+{
+    const bent = structuredClone(front);
+    for (const key of ['neck', 'head', 'ls', 'rs', 'le', 're', 'lw', 'rw']) bent[key][1] += 25;
+    const normal = liftOpenPose(bent, rest).kps;
+    const flipped = liftOpenPose(bent, rest, { torso: true }).kps;
+    assert.ok(normal.neck[2] > 1);
+    assert.ok(flipped.neck[2] < -1, 'torso flip must change the forward/backward bend');
+    assert.equal(flipped.neck[2], -normal.neck[2]);
+}

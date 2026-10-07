@@ -17,13 +17,21 @@
   const d = frame.contentDocument;
   for (let i = 0; i < 20 && d.querySelector('#detect-person').hidden; i++) await sleep(250);
   const report = { buttonShown: !d.querySelector('#detect-person').hidden };
+  d.querySelector('#use-person-photo').click();
+  const before = JSON.stringify(frame.contentWindow.freePose.viewer.getPose());
   const started = performance.now();
   d.querySelector('#detect-person').click();
   for (let i = 0; i < 240; i++) {
     await sleep(500);
     const text = d.querySelector('#import-status').textContent;
-    if (/已按人物图|识别失败/.test(text)) { report.status = text; break; }
+    if (/骨骼图已生成|识别失败/.test(text)) { report.status = text; break; }
   }
+  report.previewShown = !d.querySelector('#detected-pose').hidden;
+  report.unchangedBeforeApply = before === JSON.stringify(frame.contentWindow.freePose.viewer.getPose());
+  if (!report.previewShown || !report.unchangedBeforeApply) throw new Error(JSON.stringify(report));
+  d.querySelector('#apply-detected-pose').click();
+  report.applyStatus = d.querySelector('#import-status').textContent;
+  if (!report.applyStatus.startsWith('已应用骨骼')) throw new Error(report.applyStatus);
   report.seconds = Math.round((performance.now() - started) / 100) / 10;
   const reference = JSON.parse(await frame.contentWindow.freePose.serialize()).poseReference;
   const image = new Image(); image.src = reference; await image.decode();

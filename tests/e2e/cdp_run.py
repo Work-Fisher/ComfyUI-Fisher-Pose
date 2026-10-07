@@ -65,6 +65,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("scenario")
     parser.add_argument("--base", default="http://127.0.0.1:8188")
-    parser.add_argument("--workflow", default=str(ROOT / "workflows" / "Fisher-Qwen2.1-自由姿势-VNCCS-LoRA.json"))
+    parser.add_argument("--workflow", default=str(ROOT / "workflows" / "Fisher-Pose-Studio.json"))
     args = parser.parse_args()
     print(asyncio.run(run(args.scenario, args.base, args.workflow)))

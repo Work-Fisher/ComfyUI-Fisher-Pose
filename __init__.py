@@ -2,7 +2,7 @@ from .nodes import FisherPoseStudio
 from .qwen_bridge import FisherQwenPose
 from .gguf_clip import FisherQwen21GGUFCLIP
 from .free_pose import FisherQwenFreePose, FisherPoseImage
-from .fisher_anyangle import FisherAnyAngleCamera
+from .fisher_anyangle import FisherAnyAngleCamera, FisherPoseResult, FisherAnyAngleEncode, FisherShot
 from .openpose_library import register_routes
 from .saved_poses import register_routes as register_saved_pose_routes
 from .env_check import register_routes as register_env_routes
@@ -19,6 +19,12 @@ NODE_DISPLAY_NAME_MAPPINGS['FisherQwenFreePose'] = 'Fisher Qwen2.1 自由姿势'
 NODE_CLASS_MAPPINGS['FisherPoseImage'] = FisherPoseImage
 NODE_DISPLAY_NAME_MAPPINGS['FisherPoseImage'] = 'Fisher 人偶姿态图（通用）'
 NODE_CLASS_MAPPINGS['FisherAnyAngleCamera'] = FisherAnyAngleCamera
+NODE_CLASS_MAPPINGS['FisherAnyAngleEncode'] = FisherAnyAngleEncode
+NODE_DISPLAY_NAME_MAPPINGS['FisherAnyAngleEncode'] = 'Fisher 换机位编码'
+NODE_CLASS_MAPPINGS['FisherPoseResult'] = FisherPoseResult
+NODE_CLASS_MAPPINGS['FisherShot'] = FisherShot
+NODE_DISPLAY_NAME_MAPPINGS['FisherShot'] = 'Fisher 镜头'
+NODE_DISPLAY_NAME_MAPPINGS['FisherPoseResult'] = 'Fisher 最终图像'
 NODE_DISPLAY_NAME_MAPPINGS['FisherAnyAngleCamera'] = 'Fisher AnyAngle 机位'
 NODE_DISPLAY_NAME_MAPPINGS['FisherQwen21GGUFCLIP'] = 'Fisher Qwen2.1 GGUF CLIP加载器'
 WEB_DIRECTORY = "./web"

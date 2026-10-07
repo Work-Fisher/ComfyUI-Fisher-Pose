@@ -1,7 +1,8 @@
-// Run with tests/e2e/cdp_run.py on the free-pose workflow: appends the AnyAngle stage and returns the
-// serialized workflow (tools/build_anyangle_workflow.py writes it to workflows/).
+// Legacy two-stage builder for tests/fixtures only. Do not run on Fisher-Pose-Studio.json, which
+// already includes the camera branch and selects the final image with FisherPoseResult.
 (async () => {
   const app = window.app, graph = app.graph;
+  if (graph._nodes.some(n => n.type === "FisherAnyAngleCamera")) throw new Error("Camera branch already exists; use the shipped Fisher-Pose-Studio.json.");
   const byType = type => graph._nodes.find(n => (n.comfyClass || n.type) === type);
   const unet = byType('UNETLoader'), clip = byType('CLIPLoader'), vae = byType('VAELoader'), pose = byType('FisherQwenFreePose');
   const decoded = byType('VAEDecode');

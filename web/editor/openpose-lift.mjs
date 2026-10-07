@@ -69,7 +69,6 @@ export function liftOpenPose(points, rest, flips = {}) {
     kps.lh = [...planar('hipMid', 'lh').slice(0, 2), -hipTurn];
     kps.rh = [...planar('hipMid', 'rh').slice(0, 2), hipTurn];
     kps.neck = step(kps.hipMid, 'torso');
-    if (flips.torso) kps.neck[2] = -kps.neck[2];
     kps.ls = add(kps.neck, [...planar('neck', 'ls').slice(0, 2), -shoulderTurn]);
     kps.rs = add(kps.neck, [...planar('neck', 'rs').slice(0, 2), shoulderTurn]);
     kps.head = add(kps.neck, planar('neck', 'head'));

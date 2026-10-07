@@ -1,7 +1,7 @@
 // Free-pose editor: one VNCCS MakeHuman mannequin. Editing uses a free orbit view;
 // the output is always the VNCCS front capture (yaw 0 / pitch 0, white background,
 // flat white ambient light), which is what the VNCCS_QI2_PoseStudio LoRA was trained on.
-import { PoseViewerCore } from '../vnccs/vnccs_pose_studio_core.mjs';
+import { PoseViewerCore } from '../vnccs/vnccs_pose_studio_core.mjs?v=20261005-skeleton1';
 import { loadMorphPack, solveMorph, buildStaticModelData } from '../vnccs/vnccs_pose_morph_runtime.mjs';
 import { HAND_PRESETS } from '../vnccs/vnccs_hand_presets.mjs';
 import { readSkeletonImage } from './pose-import.mjs';
@@ -10,7 +10,7 @@ import { COMMON_POSES, directionKeypoints } from './common-poses.mjs';
 
 const $ = selector => document.querySelector(selector);
 const embedded = new URLSearchParams(location.search).has('embedded');
-const INSTRUCTION = 'Draw character from image2';
+const INSTRUCTION = 'Draw character from image2\nGenerate exactly one person. Use image1 only for the body pose and body orientation. Render the person from image2 in that pose, replacing the original pose completely. Preserve the same facial identity, hairstyle, glasses, clothing, garment lengths, footwear and overall appearance from image2. Do not add another person or keep a second copy of the original pose.';
 const FRONT = { yaw: 0, pitch: 0 };
 const CAPTURE_BACKGROUND = [255, 255, 255];
 const CAPTURE_LIGHTS = [{ type: 'ambient', color: '#ffffff', intensity: 1.0 }];
@@ -48,8 +48,13 @@ async function loadBodyPack() {
     throw new Error('人体数据文件缺失或不完整（web/vnccs/assets/pose_studio_makehuman.v2.bin，约 86MB）。可能被网盘删除或没下载完整，请从 GitHub 重新下载插件：github.com/Work-Fisher/ComfyUI-Fisher-Pose');
 }
 
-const NO_NEW_ANGLE = { enabled: false, yaw: 0, pitch: 0 };
-let doc = { mesh: { ...DEFAULT_MESH }, proportions: { ...DEFAULT_PROPORTIONS }, pose: null, transform: { ...NEUTRAL_TRANSFORM }, width: 1024, height: 1024, openpose: null, anyAngle: { ...NO_NEW_ANGLE } };
+const NO_NEW_ANGLE = { enabled: false, yaw: 0, pitch: 0, zoom: 1, offsetX: 0, offsetY: 0 };
+let studio = { camera: false, canGenerate: false, canOpenWorkflow: false };
+let editMode = 'pose';
+let previewRevision = 0;
+let autoFitTimer = null;
+let fitting = false;
+let doc = { mesh: { ...DEFAULT_MESH }, proportions: { ...DEFAULT_PROPORTIONS }, pose: null, transform: { ...NEUTRAL_TRANSFORM }, width: 1024, height: 1024, openpose: null, referenceMode: 'group', swapPeople: false, outputSkeleton: true, autoFit: true, anyAngle: { ...NO_NEW_ANGLE } };
 let extraPrompt = '';
 let pack = null;
 let ready = false;
@@ -57,6 +62,9 @@ let selectedBoneName = null;
 let previewTimer = null;
 let morphTimer = null;
 let personAspect = null; // width / height of the connected person photo, when known
+let posePhoto = null;
+let detectingPose = false;
+let secondReferenceConnected = false;
 let personPreviewUrls = [null, null]; // person photos wired to image2 / image3, when the node has them
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
@@ -66,6 +74,11 @@ function instructionText() {
     if (!doc.people) return INSTRUCTION;
     const xs = doc.people.map((person, index) => (index === doc.active ? doc.transform : person.transform).x);
     const [first, second] = xs[0] <= xs[1] ? ['left', 'right'] : ['right', 'left'];
+    if (doc.referenceMode === 'group') {
+        // Match the backend's empirically calibrated whole-photo binding.
+        const [sourceFirst, sourceSecond] = doc.swapPeople ? ['left', 'right'] : ['right', 'left'];
+        return `Draw the person on the ${sourceFirst} side of the original group photo in image2 in the pose and position of the ${first} mannequin in image1, and the person on the ${sourceSecond} side of the original group photo in image2 in the pose and position of the ${second} mannequin in image1. Generate exactly two people, one per mannequin. Preserve each reference person's face, hairstyle, glasses and clothing. Replace their original poses completely. Do not duplicate anyone.`;
+    }
     return `Draw the ${first} character from image2 in the pose of the ${first} mannequin in image1, and the ${second} character from image3 in the pose of the ${second} mannequin in image1.`;
 }
 const promptText = () => [instructionText(), ...extraPrompt.split('\n').map(line => line.trim())].filter(Boolean).join('\n');
@@ -168,12 +181,70 @@ function loadModel(pose) {
 }
 
 // The capture camera never moves; `snap` also brings the free editing view back to it.
+function shotArgs(width = studio.outputWidth || doc.width, height = studio.outputHeight || doc.height) {
+    const angle = doc.anyAngle.enabled ? doc.anyAngle : NO_NEW_ANGLE;
+    return [width, height, angle.zoom, angle.offsetX, angle.offsetY, angle.yaw, -angle.pitch];
+}
+
 function updateCamera(snap) {
-    const args = [doc.width, doc.height, 1, 0, 0, FRONT.yaw, FRONT.pitch];
-    if (snap) viewer.snapToCaptureCamera(...args);
-    else viewer.updateCaptureCamera(...args);
+    if (snap) viewer.snapToCaptureCamera(...shotArgs());
+    else viewer.updateCaptureCamera(...shotArgs());
     refreshControls();
     schedulePreview();
+}
+
+// Coalesce drag updates; fitting never recursively schedules another fit.
+function requestAutoFit() {
+    if (!ready || !doc.autoFit || fitting || autoFitTimer) return;
+    autoFitTimer = setTimeout(() => { autoFitTimer = null; autoFrame(); }, 90);
+}
+
+function autoFrame() {
+    if (!ready || !doc.autoFit || fitting) return;
+    fitting = true;
+    try {
+        // Keep the trained front reference fully framed, then fit the chosen shot.
+        frameEveryone(false);
+        if (studio.camera && doc.anyAngle.enabled) {
+            const THREE = viewer.THREE, angle = doc.anyAngle;
+            angle.zoom = 1; angle.offsetX = 0; angle.offsetY = 0;
+            const bounds = () => {
+                viewer.updateCaptureCamera(...shotArgs());
+                viewer.captureCamera.updateMatrixWorld(true);
+                return measurePeople().ndc;
+            };
+            for (let pass = 0; pass < 6; pass++) {
+                const box = bounds(), size = box.getSize(new THREE.Vector2());
+                if (![size.x, size.y].every(Number.isFinite)) break;
+                angle.zoom = clamp(angle.zoom * 1.68 / Math.max(size.x, size.y, 0.001), 0.1, 7);
+                const mid = bounds().getCenter(new THREE.Vector2());
+                const epsilon = 0.1;
+                angle.offsetX += epsilon;
+                const dx = bounds().getCenter(new THREE.Vector2()).sub(mid).divideScalar(epsilon);
+                angle.offsetX -= epsilon; angle.offsetY += epsilon;
+                const dy = bounds().getCenter(new THREE.Vector2()).sub(mid).divideScalar(epsilon);
+                angle.offsetY -= epsilon;
+                // Damped least squares stays finite at side-on views (world X is then depth).
+                const a = dx.dot(dx) + 0.001, b = dx.dot(dy), c = dy.dot(dy) + 0.001;
+                const u = -dx.dot(mid), v = -dy.dot(mid), det = a * c - b * b;
+                angle.offsetX += clamp((u * c - v * b) / det, -10, 10);
+                angle.offsetY += clamp((v * a - u * b) / det, -10, 10);
+            }
+            const finalBounds = bounds();
+            const edge = Math.max(Math.abs(finalBounds.min.x), Math.abs(finalBounds.max.x), Math.abs(finalBounds.min.y), Math.abs(finalBounds.max.y));
+            if (Number.isFinite(edge) && edge > 0.84) angle.zoom *= 0.84 / edge;
+        }
+        updateCamera(editMode === 'camera');
+        refreshAngle();
+    } finally { fitting = false; }
+}
+
+function setAutoFit(enabled) {
+    doc.autoFit = Boolean(enabled);
+    doc.anyAngle = normalizeShot(doc.anyAngle);
+    $('#auto-fit').checked = doc.autoFit;
+    if (!doc.autoFit) { clearTimeout(autoFitTimer); autoFitTimer = null; }
+    else { autoFrame(); schedulePreview(); }
 }
 
 function fitFrame(snap = false) {
@@ -195,24 +266,30 @@ function fitFrame(snap = false) {
 
 function capture(width, height) {
     viewer.updateLights(CAPTURE_LIGHTS);
-    return viewer.capture(width, height, 1, CAPTURE_BACKGROUND, 0, 0, FRONT.yaw, FRONT.pitch);
+    return viewer.capture(width, height, 1, CAPTURE_BACKGROUND, 0, 0, FRONT.yaw, FRONT.pitch, doc.outputSkeleton);
 }
 
 function schedulePreview() {
     if (!ready) return;
-    clearTimeout(previewTimer);
+    requestAutoFit();
+    if (previewTimer) return;
+    const revision = ++previewRevision;
     previewTimer = setTimeout(async () => {
-        await viewer.waitForCaptureReady();
-        const scale = Math.min(1, 480 / Math.max(doc.width, doc.height));
-        const url = capture(Math.round(doc.width * scale), Math.round(doc.height * scale));
-        if (url) { $('#capture-preview').src = url; $('#inset-preview').src = url; }
-        if (doc.anyAngle.enabled) {
-            viewer.updateLights(CAPTURE_LIGHTS);
-            // The core's capture pitch is positive looking up; the UI's is positive looking down.
-            $('#angle-preview').src = viewer.capture(Math.round(doc.width * scale), Math.round(doc.height * scale), 1, CAPTURE_BACKGROUND, 0, 0, doc.anyAngle.yaw, -doc.anyAngle.pitch);
-            updateCamera(false);
-        }
-    }, 300);
+        previewTimer = null;
+        try {
+            await viewer.waitForCaptureReady();
+            if (revision !== previewRevision) return;
+            const scale = Math.min(1, 480 / Math.max(doc.width, doc.height));
+            const front = capture(Math.round(doc.width * scale), Math.round(doc.height * scale));
+            if (front) $('#capture-preview').src = front;
+            const width = studio.outputWidth || doc.width, height = studio.outputHeight || doc.height;
+            const previewScale = Math.min(1, 480 / Math.max(width, height));
+            const args = shotArgs(Math.round(width * previewScale), Math.round(height * previewScale));
+            const shot = viewer.capture(args[0], args[1], args[2], CAPTURE_BACKGROUND, ...args.slice(3), doc.outputSkeleton);
+            if (shot) { $('#inset-preview').src = shot; $('#angle-preview').src = shot; }
+        } catch (error) { toast('预览未完成：' + error.message); }
+        finally { viewer.updateCaptureCamera(...shotArgs()); }
+    }, 180);
 }
 
 // --- OpenPose one-click posing ---------------------------------------------
@@ -307,10 +384,18 @@ function pickOption(options, preferred) {
 async function detectPersonPose() {
     const status = $('#import-status');
     const button = $('#detect-person');
+    if (!posePhoto || detectingPose || !dwposeReady) return;
+    const source = { ...posePhoto };
+    detectedPose = null;
+    $('#detected-pose').hidden = true;
+    detectingPose = true;
+    refreshPosePhoto();
     button.disabled = true;
     try {
-        status.textContent = '正在上传人物图…';
-        const blob = await (await fetch(personPreviewUrls[doc.active])).blob();
+        status.textContent = `正在上传姿势参考图：${source.name}…`;
+        const response = await fetch(source.url);
+        if (!response.ok) throw new Error('参考图片读取失败');
+        const blob = await response.blob();
         const form = new FormData();
         // Named by content, so detecting the same photo again reuses one copy in input/fisher_pose.
         const bytes = new Uint8Array(await blob.arrayBuffer());
@@ -343,10 +428,14 @@ async function detectPersonPose() {
         const image = new Image();
         image.src = '/view?' + new URLSearchParams({ filename: output.filename, subfolder: output.subfolder || '', type: output.type || 'temp' });
         await image.decode();
-        status.textContent = `已按人物图摆好：${poseFromSkeleton(image, 'photo', '人物图')}。前后不对可用下方深度修正，手势请在「手势」里选。`;
+        detectedPose = { image, name: source.name };
+        $('#detected-pose-preview').src = image.src;
+        $('#download-detected-pose').href = image.src;
+        $('#detected-pose').hidden = false;
+        status.textContent = '骨骼图已生成，人偶尚未改变。检查结果后点击「应用到当前人偶」。';
     } catch (error) {
         status.textContent = `识别失败：${error.message.includes('未识别到') ? '图里没有检测到完整的人' : error.message}`;
-    } finally { button.disabled = false; }
+    } finally { detectingPose = false; refreshPosePhoto(); }
 }
 
 async function importEntry(entry) {
@@ -613,7 +702,46 @@ async function deleteSavedPose(entry, skipConfirm = false) {
 }
 
 $('#save-pose').onclick = () => saveCurrentPose();
+let detectedPose = null;
+function refreshPosePhoto() {
+    $('#detect-person').disabled = !posePhoto || !dwposeReady || detectingPose;
+    $('#detect-person').textContent = detectingPose ? '正在识别骨骼…' : posePhoto ? '识别骨骼图' : '先选择姿势参考图';
+    $('#apply-detected-pose').textContent = doc.people ? `应用到人物 ${(doc.active ?? 0) + 1}` : '应用到当前人偶';
+    $('#choose-pose-photo').disabled = detectingPose;
+    $('#use-person-photo').disabled = detectingPose;
+    $('#use-person-photo').hidden = !personPreviewUrls[doc.active ?? 0] || Boolean(doc.people && doc.referenceMode === 'group');
+    $('#pose-detector-hint').textContent = dwposeReady ? '仅提取动作，不替换工作流中的人物照片。' : '识别需要 DWPose（comfyui_controlnet_aux）；预设和骨架导入仍可使用。';
+}
+function selectPosePhoto(url, name, owned = false) {
+    if (detectingPose) return;
+    if (posePhoto?.owned) URL.revokeObjectURL(posePhoto.url);
+    posePhoto = { url, name, owned };
+    detectedPose = null;
+    $('#detected-pose').hidden = true;
+    $('#pose-photo-preview').src = url;
+    $('#pose-photo-name').textContent = name;
+    $('#pose-photo-selection').hidden = false;
+    $('#import-status').textContent = '已选择参考图，先识别骨骼，再应用到人偶。';
+    refreshPosePhoto();
+}
+const onPosePhotoFile = file => {
+    if (file && (!file.type || file.type.startsWith('image/'))) selectPosePhoto(URL.createObjectURL(file), file.name, true);
+};
+$('#choose-pose-photo').onclick = () => {
+    const choose = window.frameElement?.fisherChooseReference;
+    if (choose) choose(onPosePhotoFile);
+    else { $('#pose-photo-file').value = ''; $('#pose-photo-file').click(); }
+};
+$('#pose-photo-file').onchange = event => onPosePhotoFile(event.target.files[0]);
+$('#use-person-photo').onclick = () => selectPosePhoto(personPreviewUrls[doc.active ?? 0], `已接人物图 ${(doc.active ?? 0) + 1}`);
 $('#detect-person').onclick = detectPersonPose;
+$('#apply-detected-pose').onclick = () => {
+    if (!detectedPose) return;
+    try {
+        const result = poseFromSkeleton(detectedPose.image, 'photo', detectedPose.name);
+        $('#import-status').textContent = `已应用骨骼：${result}。前后不对可用深度修正，手势可单独调整。`;
+    } catch (error) { $('#import-status').textContent = `应用失败：${error.message}`; }
+};
 
 // --- Two people -------------------------------------------------------------
 // The VNCCS core edits one rig; everybody else is a passive clone that still renders in the capture.
@@ -676,7 +804,7 @@ function switchPerson(index) {
     forgetHistory();
     selectedBoneName = null;
     refreshPeople(); refreshFlips(); refreshControls(); updateCamera(false);
-    $('#import-status').textContent = `正在编辑人物 ${index + 1}（对应 image${index + 2}）。`;
+    $('#import-status').textContent = `正在编辑人物 ${index + 1}（使用人物 ${index + 1} 的照片）。`;
 }
 
 function addPerson() {
@@ -695,7 +823,7 @@ function addPerson() {
     if (doc.width / doc.height < 1.2) { setSize(...sizeForAspect(4 / 3)); toast('两个人时人偶图改成了 4:3 横图，可在「人偶图尺寸」里改'); }
     frameEveryone();
     refreshPeople(); refreshControls();
-    $('#import-status').textContent = '已添加人物 2（对应 image3）。给它选一个姿势，或点画面里的人偶切换编辑对象。';
+    $('#import-status').textContent = '已添加人物 2，请在节点接入它的照片。给它选一个姿势，或点画面里的人偶切换编辑对象。';
 }
 
 function removePerson() {
@@ -717,6 +845,7 @@ function measurePeople() {
     const meshes = [viewer.skinnedMesh, ...[...viewer.passiveCharacters.values()].map(entry => entry.mesh)].filter(Boolean);
     for (const mesh of meshes) {
         mesh.updateMatrixWorld(true);
+        mesh.skeleton?.update();
         const count = mesh.geometry.attributes.position.count;
         for (let i = 0; i < count; i += 23) {
             mesh.getVertexPosition(i, v).applyMatrix4(mesh.matrixWorld);
@@ -735,48 +864,92 @@ function measurePeople() {
 // the splat whatever its scale.
 function anyAngleCamera() {
     const THREE = viewer.THREE;
-    viewer.updateCaptureCamera(doc.width, doc.height, 1, 0, 0, doc.anyAngle.yaw, -doc.anyAngle.pitch);
+    viewer.updateCaptureCamera(...shotArgs());
     const camera = viewer.captureCamera;
     camera.updateMatrixWorld(true);
     const { box } = measurePeople();
     const center = box.getCenter(new THREE.Vector3());
     const height = Math.max(box.max.y - box.min.y, 1e-3);
-    const result = {
+    return {
         position: camera.position.clone().sub(center).divideScalar(height).toArray(),
         forward: camera.getWorldDirection(new THREE.Vector3()).toArray(),
-        fov: camera.fov, aspect: doc.width / doc.height,
+        fov: camera.fov, zoom: camera.zoom, aspect: camera.aspect,
     };
-    updateCamera(false);
-    return result;
 }
 
 function refreshAngle() {
     const angle = doc.anyAngle;
-    $('#angle-enabled').checked = angle.enabled;
-    $('#angle-controls').classList.toggle('fp-disabled', !angle.enabled);
-    $('#angle-yaw').value = angle.yaw; setOutput('angle-yaw', `${Math.round(angle.yaw)}°`);
-    $('#angle-pitch').value = angle.pitch; setOutput('angle-pitch', `${Math.round(angle.pitch)}°`);
-    if (!angle.enabled) $('#angle-preview').removeAttribute('src');
+    $('#auto-fit').checked = doc.autoFit;
+    $('#output-skeleton').checked = doc.outputSkeleton;
+    for (const key of ['yaw', 'pitch', 'zoom']) {
+        $(`#angle-${key}`).value = angle[key];
+        setOutput(`angle-${key}`, key === 'zoom' ? `${angle[key].toFixed(2)}×` : `${Math.round(angle[key])}°`);
+    }
+    $('#camera-unavailable').hidden = studio.camera;
+    $('#open-studio').hidden = studio.camera || !studio.canOpenWorkflow;
+    $('#angle-controls').hidden = !studio.camera;
+    $('#mode-camera').disabled = !studio.camera;
+    $('#generate-editor').hidden = !studio.canGenerate;
+    $('#shot-status').textContent = angle.enabled ? '按当前镜头生成' : '正面镜头';
+    $('#final-size').textContent = `${studio.outputWidth || doc.width} × ${studio.outputHeight || doc.height}`;
+    if (!studio.camera && angle.enabled) $('#camera-unavailable').textContent = '此工作流无法生成已保存的镜头。请打开完整工作流，或恢复正面镜头后应用。';
+}
+
+// Whether the shot needs the camera branch. With 自动撑满 on, zoom and offsets are derived by the
+// fit (rarely exactly 1/0), so only a turned camera counts; a hand-set framing counts when it is off.
+// Counting the fitted zoom kept 正面 stuck in the slow camera branch.
+function normalizeShot(angle, autoFit = doc.autoFit) {
+    const shot = { ...NO_NEW_ANGLE, ...angle };
+    shot.yaw = clamp(Number(shot.yaw) || 0, -180, 180);
+    shot.pitch = clamp(Number(shot.pitch) || 0, -60, 60);
+    shot.zoom = clamp(Number(shot.zoom) || 1, 0.1, 7);
+    shot.offsetX = Number(shot.offsetX) || 0;
+    shot.offsetY = Number(shot.offsetY) || 0;
+    const turned = Math.abs(shot.yaw) > 0.01 || Math.abs(shot.pitch) > 0.01;
+    const framed = !autoFit && (Math.abs(shot.zoom - 1) > 0.001 || Math.abs(shot.offsetX) > 0.01 || Math.abs(shot.offsetY) > 0.01);
+    shot.enabled = turned || framed;
+    if (!shot.enabled) Object.assign(shot, { zoom: 1, offsetX: 0, offsetY: 0 });
+    return shot;
 }
 
 function setAngle(values) {
-    doc.anyAngle = { ...doc.anyAngle, ...values };
+    if (!studio.camera) return;
+    if ('zoom' in values || 'offsetX' in values || 'offsetY' in values) setAutoFit(false);
+    doc.anyAngle = normalizeShot({ ...doc.anyAngle, ...values });
     refreshAngle();
-    schedulePreview();
+    updateCamera(editMode === 'camera');
+    requestAutoFit();
 }
 
-$('#angle-enabled').onchange = event => setAngle({ enabled: event.target.checked });
-$('#angle-yaw').oninput = event => setAngle({ yaw: Number(event.target.value) });
-$('#angle-pitch').oninput = event => setAngle({ pitch: Number(event.target.value) });
-for (const button of document.querySelectorAll('[data-angle-yaw]')) button.onclick = () => setAngle({ enabled: true, yaw: Number(button.dataset.angleYaw) });
-// Take the angle the viewport is looking from (around the capture pivot), keep the capture distance.
+function setEditMode(mode) {
+    if (mode === 'camera' && !studio.camera) return;
+    editMode = mode;
+    $('#mode-pose').classList.toggle('active', mode === 'pose');
+    $('#mode-camera').classList.toggle('active', mode === 'camera');
+    $('#mode-help').textContent = mode === 'camera'
+        ? '拖动画面定拍摄角度，滚轮调远近，右键拖动调构图。橙框内是拍摄范围。'
+        : '拖关节摆动作，拖空白处换方向观察。观察方向不改变已定好的镜头。';
+    $('#selection-hint').textContent = mode === 'camera' ? '定镜头 · 拖动转镜头，滚轮调远近' : '摆姿势 · 拖关节调整，Shift+拖动移动人物';
+    viewer.orbit.enabled = mode === 'pose';
+    updateCamera(true);
+    viewer.orbit.enabled = mode === 'pose';
+}
+
+$('#mode-pose').onclick = () => setEditMode('pose');
+$('#mode-camera').onclick = () => setEditMode('camera');
+for (const key of ['yaw', 'pitch', 'zoom']) $('#angle-' + key).oninput = event => setAngle({ [key]: Number(event.target.value) });
+for (const button of document.querySelectorAll('[data-angle-yaw]')) button.onclick = () => setAngle({ yaw: Number(button.dataset.angleYaw) });
+$('#reset-camera').onclick = () => {
+    doc.anyAngle = { ...NO_NEW_ANGLE };
+    refreshAngle(); updateCamera(true);
+};
+$('#open-studio').onclick = () => parent.postMessage({ type: 'fisher-open-workflow' }, location.origin);
 $('#angle-from-view').onclick = () => {
     const THREE = viewer.THREE;
     const pivot = viewer.sceneCameraTarget || viewer.orbit.target;
     const d = viewer.camera.position.clone().sub(pivot);
-    const yaw = THREE.MathUtils.radToDeg(Math.atan2(d.x, d.z));
-    const pitch = THREE.MathUtils.radToDeg(Math.atan2(d.y, Math.hypot(d.x, d.z)));
-    setAngle({ enabled: true, yaw: Math.round(yaw), pitch: Math.round(clamp(pitch, -60, 60)) });
+    setAngle({ yaw: THREE.MathUtils.radToDeg(Math.atan2(d.x, d.z)), pitch: THREE.MathUtils.radToDeg(Math.atan2(d.y, Math.hypot(d.x, d.z))) });
+    setEditMode('camera');
 };
 
 // 撑满 for two: scale and centre the whole group in the capture frame, keeping who stands where.
@@ -788,7 +961,7 @@ function frameEveryone(snap = false) {
         if (index === doc.active) { doc.transform = { ...person.transform }; viewer.setActiveCharacterAppearance({ transform: doc.transform }); }
         else viewer.setPassiveCharacterState(passiveId(index), { pose: person.pose, transform: person.transform, color: PERSON_COLOR });
     });
-    const measure = () => { updateCamera(false); return measurePeople(); };
+    const measure = () => { viewer.updateCaptureCamera(doc.width, doc.height, 1, 0, 0, 0, 0); return measurePeople(); };
     for (let pass = 0; pass < 3; pass++) {
         const { box, ndc } = measure();
         const size = ndc.getSize(new THREE.Vector2());
@@ -814,6 +987,19 @@ function frameEveryone(snap = false) {
 
 function refreshPeople() {
     const two = Boolean(doc.people);
+    $('#people-source').hidden = !two;
+    $('#reference-mode').value = doc.referenceMode;
+    for (const button of document.querySelectorAll('[data-reference-mode]')) button.setAttribute('aria-pressed', String(button.dataset.referenceMode === doc.referenceMode));
+    $('#group-photo-wrap').hidden = doc.referenceMode !== 'group' || !personPreviewUrls[0];
+    $('#group-left-tag').textContent = doc.swapPeople ? '人物 2' : '人物 1';
+    $('#group-right-tag').textContent = doc.swapPeople ? '人物 1' : '人物 2';
+    $('#group-photo-wrap').classList.toggle('swapped', doc.swapPeople);
+    $('#swap-people').hidden = doc.referenceMode !== 'group';
+    $('#group-photo-preview').hidden = doc.referenceMode !== 'group' || !personPreviewUrls[0];
+    if (personPreviewUrls[0]) $('#group-photo-preview').src = personPreviewUrls[0];
+    $('#people-mapping').textContent = doc.referenceMode === 'group'
+        ? (doc.swapPeople ? '1 ← 原图右侧\n2 ← 原图左侧' : '1 ← 原图左侧\n2 ← 原图右侧')
+        : '人物 1 用第一张照片\n人物 2 用第二张照片';
     for (const button of document.querySelectorAll('[data-person]')) {
         const index = Number(button.dataset.person);
         button.hidden = index >= (two ? MAX_PEOPLE : 1) || (!two && index > 0);
@@ -821,14 +1007,19 @@ function refreshPeople() {
     }
     $('#people [data-person="0"]').hidden = !two;
     $('#add-person').hidden = two;
-    $('#detect-person').hidden = !(dwposeReady && personPreviewUrls[doc.active]);
-    $('#detect-person').textContent = two ? `从人物图识别姿势（人物 ${doc.active + 1}）` : '从人物图识别姿势';
+    refreshPosePhoto();
 }
 
 for (const button of document.querySelectorAll('[data-person]')) {
     button.onclick = event => (event.target.closest('#remove-person') ? removePerson() : switchPerson(Number(button.dataset.person)));
 }
 $('#add-person').onclick = addPerson;
+$('#reference-mode').onchange = event => { doc.referenceMode = event.target.value; refreshPeople(); refreshControls(); };
+for (const button of document.querySelectorAll('[data-reference-mode]')) button.onclick = () => {
+    $('#reference-mode').value = button.dataset.referenceMode;
+    $('#reference-mode').dispatchEvent(new Event('change'));
+};
+$('#swap-people').onclick = () => { doc.swapPeople = !doc.swapPeople; refreshPeople(); refreshControls(); };
 
 // Clicking the other mannequin (a click, not an orbit drag, and not on a joint) edits that person.
 function pickPassive(event) {
@@ -851,12 +1042,33 @@ function pickPassive(event) {
 
 function setupInteraction() {
     const THREE = viewer.THREE;
+    window.addEventListener('pointermove', event => { if (event.buttons && stage.contains(event.target)) requestAutoFit(); });
+    window.addEventListener('pointerup', () => { if (doc.autoFit) schedulePreview(); });
+    canvas.addEventListener('pointerdown', event => {
+        if (editMode !== 'camera' || !ready) return;
+        event.stopImmediatePropagation(); event.preventDefault();
+        const start = { x: event.clientX, y: event.clientY, ...doc.anyAngle };
+        const pan = event.button !== 0 || event.shiftKey;
+        const move = e => {
+            const x = e.clientX - start.x, y = e.clientY - start.y;
+            setAngle(pan ? { offsetX: start.offsetX + x * 0.035 / start.zoom, offsetY: start.offsetY - y * 0.035 / start.zoom }
+                         : { yaw: start.yaw - x * 0.35, pitch: start.pitch + y * 0.25 });
+        };
+        const end = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', end); window.removeEventListener('pointercancel', end); };
+        window.addEventListener('pointermove', move); window.addEventListener('pointerup', end); window.addEventListener('pointercancel', end);
+    }, { capture: true });
+    canvas.addEventListener('wheel', event => {
+        if (editMode !== 'camera') return;
+        event.stopImmediatePropagation(); event.preventDefault();
+        setAngle({ zoom: doc.anyAngle.zoom * Math.exp(-event.deltaY * 0.001) });
+    }, { capture: true, passive: false });
     viewer.orbit.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.PAN, RIGHT: THREE.MOUSE.PAN };
     // Shift+drag moves the person inside the front frame; it must pre-empt orbit and bone picking.
     canvas.addEventListener('pointerdown', event => {
         if (event.button !== 0 || !event.shiftKey || !ready) return;
         event.stopImmediatePropagation();
         event.preventDefault();
+        manualPlacement();
         viewer.recordState();
         const camera = viewer.camera;
         const distance = camera.position.distanceTo(viewer.orbit.target);
@@ -939,8 +1151,16 @@ function bindSlider(input, onValue) {
     input.addEventListener('change', () => { gesture = false; });
 }
 
+// Hand placement and 自动撑满 cannot both win: the fit would redo the framing 90ms later.
+function manualPlacement() {
+    if (!doc.autoFit) return;
+    setAutoFit(false);
+    toast('已关闭「自动撑满」，保留手动调整的位置和大小');
+}
+
 for (const [id, key] of [['zoom', 'zoom'], ['tx', 'x'], ['ty', 'y']]) {
     bindSlider($(`#${id}`), value => {
+        manualPlacement();
         doc.transform = { ...doc.transform, [key]: value };
         viewer.setActiveCharacterAppearance({ transform: doc.transform });
         refreshControls(); schedulePreview();
@@ -976,6 +1196,8 @@ for (const side of ['l', 'r']) {
     });
 }
 $('#snap-view').onclick = () => updateCamera(true);
+$('#output-skeleton').onchange = event => { doc.outputSkeleton = event.target.checked; schedulePreview(); };
+$('#auto-fit').onchange = event => setAutoFit(event.target.checked);
 $('#fit-frame').onclick = $('#fit-frame-2').onclick = () => { viewer.recordState(); if (doc.people) frameEveryone(); else fitFrame(); };
 $('#reset-bone').onclick = () => { viewer.recordState(); viewer.resetSelectedBone(); refreshControls(); schedulePreview(); };
 $('#reset-pose').onclick = () => { viewer.recordState(); resetPose(); doc.openpose = null; refreshFlips(); refreshControls(); schedulePreview(); };
@@ -1009,6 +1231,7 @@ async function loadPersonAspect(url) {
 
 // Old ComfyUI cores cannot run Qwen Image 2.1 at all (see env_check.py): say so before anyone poses.
 async function checkEnvironment() {
+    if (!studio.canGenerate) return;
     try {
         const env = await (await fetch('/fisher_pose/env', { cache: 'no-store' })).json();
         if (env.qwen21) return;
@@ -1024,7 +1247,7 @@ for (const [key, label, min, max, step] of BODY_SLIDERS) {
         doc.mesh = { ...doc.mesh, [key]: Number(event.target.value) };
         refreshControls();
         clearTimeout(morphTimer);
-        morphTimer = setTimeout(() => { loadModel(rotationsOnly(viewer.getPose())); updateCamera(false); }, 120);
+        morphTimer = setTimeout(() => { morphTimer = null; loadModel(rotationsOnly(viewer.getPose())); updateCamera(false); }, 120);
     });
 }
 $('#reset-body').onclick = () => { doc.mesh = { ...DEFAULT_MESH }; loadModel(rotationsOnly(viewer.getPose())); updateCamera(false); };
@@ -1065,13 +1288,24 @@ new ResizeObserver(() => viewer.resize(stage.clientWidth, stage.clientHeight)).o
 // --- Node bridge ------------------------------------------------------------
 
 async function serialize() {
+    if (morphTimer) { clearTimeout(morphTimer); morphTimer = null; loadModel(rotationsOnly(viewer.getPose())); }
+    clearTimeout(autoFitTimer); autoFitTimer = null;
+    autoFrame();
     await viewer.waitForCaptureReady();
     const poseReference = capture(doc.width, doc.height);
     updateCamera(false);
     doc.pose = savedPose();
     const people = doc.people ? peopleNow() : undefined;
     const anyAngle = doc.anyAngle.enabled ? { ...doc.anyAngle, camera: anyAngleCamera() } : { ...doc.anyAngle };
-    return JSON.stringify({ version: 2, kind: 'vnccs-free-pose', ...doc, people, active: undefined, anyAngle, camera: FRONT, poseReference });
+    let shotPreview;
+    if (anyAngle.enabled) {
+        const width = studio.outputWidth || doc.width, height = studio.outputHeight || doc.height;
+        const scale = Math.min(1, 512 / Math.max(width, height));
+        const args = shotArgs(Math.round(width * scale), Math.round(height * scale));
+        shotPreview = viewer.capture(args[0], args[1], args[2], CAPTURE_BACKGROUND, ...args.slice(3), doc.outputSkeleton);
+        viewer.updateCaptureCamera(...shotArgs());
+    }
+    return JSON.stringify({ version: 2, kind: 'vnccs-free-pose', ...doc, people, active: undefined, anyAngle, camera: FRONT, poseReference, shotPreview });
 }
 
 function personFrom(saved) {
@@ -1091,10 +1325,10 @@ function docFrom(saved) {
     const people = Array.isArray(saved.people) && saved.people.length > 1 ? saved.people.slice(0, 2).map(personFrom) : null;
     const { grips, ...first } = people ? people[0] : personFrom(saved);
     return {
-        ...first, people, active: 0,
+        ...first, people, active: 0, referenceMode: saved.referenceMode || (secondReferenceConnected ? 'separate' : 'group'), swapPeople: saved.swapPeople === true, outputSkeleton: saved.outputSkeleton === true, autoFit: saved.autoFit !== false,
         // The mannequin size lives only here; the node's width/height are the separate output size.
         width: round16(Number(saved.width) || doc.width), height: round16(Number(saved.height) || doc.height),
-        anyAngle: { ...NO_NEW_ANGLE, ...saved.anyAngle, camera: undefined },
+        anyAngle: saved.anyAngle?.enabled ? normalizeShot({ ...saved.anyAngle, camera: undefined }, saved.autoFit !== false) : { ...NO_NEW_ANGLE },
     };
 }
 
@@ -1113,7 +1347,14 @@ function applyPayload(payload) {
 
 let pendingPayload = null;
 async function start(payload) {
+    studio = { camera: false, canGenerate: false, canOpenWorkflow: false, ...payload?.studio };
+    personPreviewUrls = [payload?.referencePreview || null, payload?.referencePreview2 || null];
+    secondReferenceConnected = payload?.referenceImage2Connected ?? Boolean(personPreviewUrls[1]);
     const restored = payload ? applyPayload(payload) : false;
+    // Opening the editor always starts with source-left as person 1, as requested.
+    doc.swapPeople = false;
+    doc.outputSkeleton = true;
+    if (!restored && secondReferenceConnected) doc.referenceMode = 'separate';
     personAspect = await loadPersonAspect(payload?.referencePreview);
     $('[data-ratio=person]').hidden = !personAspect;
     if (!restored && personAspect) [doc.width, doc.height] = sizeForAspect(personAspect).map(round16);
@@ -1129,13 +1370,14 @@ async function start(payload) {
     refreshFlips();
     refreshPeople();
     refreshAngle();
+    setEditMode('pose');
     void loadBuiltin();
     void loadLibrary();
     void loadSavedList();
     await viewer.waitForCaptureReady();
     $('#loading').hidden = true;
     $('#apply-editor').disabled = false;
-    $('#save-status').textContent = restored ? '已载入节点中的姿势' : '新姿势：可用左侧 OpenPose 图一键摆姿';
+    $('#save-status').textContent = restored ? '已恢复姿势与镜头' : '先选姿势，再定镜头';
     schedulePreview();
 }
 
@@ -1145,14 +1387,26 @@ window.addEventListener('message', event => {
     else pendingPayload = event.data.payload;
 });
 $('#cancel-editor').onclick = () => parent.postMessage({ type: 'fisher-close' }, location.origin);
-$('#apply-editor').onclick = async () => {
-    $('#apply-editor').disabled = true;
+async function applyEditor(generate = false) {
+    if (!studio.camera && doc.anyAngle.enabled) { toast('当前工作流不支持此镜头，请打开完整工作流，或恢复正面镜头'); return; }
+    $('#apply-editor').disabled = $('#generate-editor').disabled = true;
+    $('#save-status').textContent = generate ? '正在保存姿势并加入生成队列…' : '正在保存姿势…';
     try {
         const pose_json = await serialize();
-        parent.postMessage({ type: 'fisher-apply', payload: { pose_json, extra_prompt: extraPrompt } }, location.origin);
-    } catch (error) { showError(error); }
-    finally { $('#apply-editor').disabled = false; }
-};
+        parent.postMessage({ type: 'fisher-apply', payload: { pose_json, extra_prompt: extraPrompt }, generate }, location.origin);
+        if (!studio.canGenerate) $('#apply-editor').disabled = false;
+    } catch (error) { applicationError(error.message); }
+}
+function applicationError(message) {
+    $('#apply-editor').disabled = $('#generate-editor').disabled = false;
+    $('#save-status').textContent = message;
+    toast(message);
+}
+$('#apply-editor').onclick = () => applyEditor(false);
+$('#generate-editor').onclick = () => applyEditor(true);
+window.addEventListener('message', event => {
+    if (event.source === parent && event.origin === location.origin && event.data?.type === 'fisher-error') applicationError(event.data.message);
+});
 
 function showError(error) {
     console.error(error);
@@ -1161,7 +1415,7 @@ function showError(error) {
 }
 
 if (!embedded) { $('#apply-editor').hidden = true; $('#cancel-editor').hidden = true; }
-window.freePose = { viewer, get doc() { return doc; }, serialize, prompt: promptText, fitFrame, importEntry, addFiles, saveCurrentPose, loadSavedPose, deleteSavedPose, applyCommonPose, galleries, detectPersonPose, addPerson, removePerson, switchPerson, frameEveryone };
+window.freePose = { viewer, get doc() { return doc; }, serialize, prompt: promptText, fitFrame, importEntry, addFiles, saveCurrentPose, loadSavedPose, deleteSavedPose, applyCommonPose, galleries, detectPersonPose, addPerson, removePerson, switchPerson, frameEveryone, setAngle, setEditMode, setAutoFit };
 
 (async () => {
     await viewer.init();

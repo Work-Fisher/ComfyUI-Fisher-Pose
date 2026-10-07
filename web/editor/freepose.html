@@ -1,13 +1,21 @@
 <!doctype html>
-<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Fisher Pose · 自由姿势</title><link rel="icon" href="data:,"><link rel="stylesheet" href="style.css"><link rel="stylesheet" href="freepose.css"></head>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Fisher Pose · 姿势与镜头</title><link rel="icon" href="data:,"><link rel="stylesheet" href="style.css"><link rel="stylesheet" href="freepose.css?v=20261006-default2"></head>
 <body>
-<header class="appbar"><div class="brand"><span class="brand-icon">⌘</span><b>Fisher Pose</b><span class="divider"></span><span>自由姿势</span><small>单人 · VNCCS 人偶 · 正面输出</small></div><div class="header-actions"><span id="save-status">编辑后应用到节点</span><button id="undo" title="撤销 Ctrl+Z">↶ 撤销</button><button id="redo" title="重做 Ctrl+Shift+Z">↷</button><button id="cancel-editor">取消</button><button class="primary" id="apply-editor" disabled>应用到节点</button></div></header>
+<header class="appbar"><div class="brand"><span class="brand-icon">⌘</span><b>Fisher Pose</b><span class="divider"></span><span>姿势与镜头</span><small>摆好动作，定好镜头，再生成</small></div><div class="header-actions"><span id="save-status">编辑后应用到节点</span><button id="undo" title="撤销 Ctrl+Z">↶ 撤销</button><button id="redo" title="重做 Ctrl+Shift+Z">↷</button><button id="cancel-editor">取消</button><button id="apply-editor" disabled>仅应用</button><button class="primary" id="generate-editor" hidden>应用并生成</button></div></header>
 <main class="fp-main">
 <aside class="left-panel fp-left">
 <section><div class="section-heading"><h2>一键摆姿</h2><span><small id="gallery-count"></small> <button class="text-button" id="clear-gallery" hidden>清空</button></span></div>
 <div class="segmented fp-sources" id="gallery-source"><button data-source="common" class="active">常用姿势</button><button data-source="builtin">FISHER小彩蛋</button><button data-source="library">我的图库</button></div>
-<button id="detect-person" class="wide fp-save fp-detect" hidden title="用 DWPose 读取人物图里的姿势，再在 3D 里微调">从人物图识别姿势</button>
-<div class="fp-pick"><label class="fp-button"><input type="file" id="pick-folder" webkitdirectory multiple>选择文件夹</label><label class="fp-button"><input type="file" id="pick-files" accept="image/*" multiple>选择图片</label></div>
+<section id="pose-photo-panel">
+<button id="choose-pose-photo" class="wide fp-save fp-detect">上传姿势参考图</button>
+<input id="pose-photo-file" type="file" accept="image/*" hidden>
+<button id="use-person-photo" class="text-button" hidden>使用已接人物图</button>
+<div id="pose-photo-selection" hidden><img id="pose-photo-preview" alt="当前姿势参考图" style="width:100%;max-height:180px;object-fit:contain"><small id="pose-photo-name"></small></div>
+<button id="detect-person" class="wide fp-save" disabled>先选择姿势参考图</button>
+<div id="detected-pose" hidden><div class="section-heading"><h2>识别出的骨骼</h2><a id="download-detected-pose" download="pose-skeleton.png">下载骨架图</a></div><img id="detected-pose-preview" alt="DWPose 识别出的骨架图"><button id="apply-detected-pose" class="wide fp-save">应用到当前人偶</button><small>先检查关节位置，再应用。遮挡和前后深度仍可能需要手动调整。</small></div>
+<small id="pose-detector-hint">仅提取动作，不替换工作流中的人物照片。</small>
+</section>
+<div class="fp-pick"><label class="fp-button"><input type="file" id="pick-folder" webkitdirectory multiple>导入骨架文件夹</label><label class="fp-button"><input type="file" id="pick-files" accept="image/*" multiple>导入骨架图片</label></div>
 <input id="gallery-filter" class="fp-search" type="search" placeholder="按名称或编号筛选" hidden>
 <div id="gallery" class="fp-gallery"><p class="muted">选 OpenPose 骨架图（黑底彩色），点缩略图即摆好姿势。也可把图片拖到这里。</p></div>
 <p id="import-status" class="muted" role="status"></p></section>
@@ -27,24 +35,39 @@
 <label class="slider-label">左手握紧<output id="grip-l-value"></output></label><input id="grip-l" data-hand="l" type="range" min="0" max="1" step="0.01" value="0">
 <label class="slider-label">右手握紧<output id="grip-r-value"></output></label><input id="grip-r" data-hand="r" type="range" min="0" max="1" step="0.01" value="0"></section>
 </aside>
-<div class="workspace"><div class="stage fp-stage" id="stage"><canvas id="viewport-canvas" tabindex="0"></canvas>
-<div class="stage-top"><div class="stage-label"><i></i>橙框 = 正面输出画面</div><div class="fp-people" id="people" title="人物 1 用 image2，人物 2 用 image3。点画面里的另一个人偶也能切换"><button data-person="0" class="active">人物 1</button><button data-person="1" hidden>人物 2<i id="remove-person" title="删除人物 2">×</i></button><button id="add-person">＋ 第二个人</button></div><button id="snap-view" class="fp-chip">⊙ 回到正面视角</button></div>
-<figure class="fp-inset"><img id="inset-preview" alt="正面输出预览"><figcaption>正面输出</figcaption></figure>
-<div class="stage-bottom"><span id="selection-hint">拖空白处转视角 · 拖关节摆姿 · Shift+拖 移动人物</span><button id="fit-frame">⤢ 人物撑满画框</button></div>
+<div class="workspace"><div class="fp-workflow-bar"><div class="segmented fp-modes"><button id="mode-pose" class="active">1 摆姿势</button><button id="mode-camera">2 定镜头</button></div><p id="mode-help">拖关节摆动作，拖空白处换方向观察。观察方向不改变镜头。</p></div><div class="stage fp-stage" id="stage"><canvas id="viewport-canvas" tabindex="0"></canvas>
+<div class="stage-top"><div class="stage-label"><i></i>橙框 = 最终拍摄范围</div><div class="fp-people" id="people" title="人物编号绑定参考人物，移动人偶不会交换身份"><button data-person="0" class="active">人物 1</button><button data-person="1" hidden>人物 2<i id="remove-person" title="删除人物 2">×</i></button><button id="add-person">＋ 第二个人</button></div><button id="snap-view" class="fp-chip">回到拍摄视角</button></div>
+<figure class="fp-inset"><img id="inset-preview" alt="最终机位预览"><figcaption>最终机位 · 人偶示意</figcaption></figure>
+<div class="stage-bottom"><span id="selection-hint">拖空白处转视角 · 拖关节摆姿 · Shift+拖 移动人物</span></div>
 <div id="env-banner" class="fp-banner" role="alert" hidden></div>
 <div id="loading" class="fp-loading"><div class="fp-spinner"></div><span id="loading-text">正在加载 MakeHuman 人体（约 86MB）…</span></div><div id="toast" role="status"></div></div>
-<div class="interaction-bar"><span><kbd>拖空白</kbd> 转视角</span><span><kbd>拖关节</kbd> 摆姿</span><span><kbd>Shift+拖</kbd> 移动人物</span><span><kbd>右键/中键</kbd> 平移</span><span><kbd>滚轮</kbd> 远近</span></div></div>
+<div class="fp-output-tools" aria-label="构图与参考图设置"><div class="fp-fit-tools"><label class="fp-toggle" title="动作变化时自动调整构图；手动调镜头远近或平移后关闭"><input id="auto-fit" type="checkbox" role="switch" checked><span class="fp-toggle-track" aria-hidden="true"></span><span>自动撑满</span></label><button id="fit-frame" title="将全部人物适配到拍摄画框">立即适配</button></div><label class="fp-toggle" title="把骨骼线与关节点一起送入模型作为姿势参考"><input id="output-skeleton" type="checkbox" role="switch"><span class="fp-toggle-track" aria-hidden="true"></span><span>骨骼参考<small>随人偶图输出</small></span></label></div>
+<div class="interaction-bar"><span id="shot-status">正面镜头</span><span>输出 <b id="final-size"></b></span></div></div>
 <aside class="right-panel">
-<div class="panel-tabs"><button class="active" data-tab="output">输出</button><button data-tab="pose">关节</button><button data-tab="body">体型</button><button data-tab="proportion">比例</button></div>
+<div class="panel-tabs"><button class="active" data-tab="output">镜头</button><button data-tab="pose">关节</button><button data-tab="body">体型</button><button data-tab="proportion">比例</button></div>
 <div id="output-panel">
-<section><div class="section-heading"><h2>人物在画面中</h2><button class="text-button" id="fit-frame-2">撑满</button></div>
-<label class="slider-label">整体转身<output id="turn-value"></output></label><input id="turn" type="range" min="-180" max="180" step="1">
+<section id="people-source" class="fp-binding" hidden><div class="section-heading"><h2>人物对应</h2><span>绑定后随人物移动</span></div>
+<select id="reference-mode" aria-label="参考方式" hidden><option value="group">一张合照</option><option value="separate">两张单人照</option></select>
+<div class="fp-reference-tabs" role="group" aria-label="参考方式"><button data-reference-mode="group" aria-pressed="true">一张合照</button><button data-reference-mode="separate" aria-pressed="false">两张单人照</button></div>
+<div class="fp-group-photo" id="group-photo-wrap"><img id="group-photo-preview" alt="人物来源合照" hidden><span class="fp-photo-tag fp-photo-left" id="group-left-tag">人物 1</span><span class="fp-photo-tag fp-photo-right" id="group-right-tag">人物 2</span></div>
+<div class="fp-binding-footer"><p id="people-mapping" aria-live="polite"></p><button id="swap-people" title="交换两个参考人物与人偶的对应">交换对应</button></div>
+<details class="fp-binding-note"><summary>人物如何对应？</summary><p>完整合照一起送入模型。按原图左右指认两个人，姿势和位置由对应人偶决定；可交换对应。模型仍可能出现人物混淆。</p></details></section>
+<section id="angle-section"><div class="section-heading"><h2>拍摄镜头</h2><button class="text-button" id="reset-camera">恢复正面</button></div>
+<p id="camera-unavailable" class="muted">此工作流只生成正面姿势。需要转镜头时，请打开完整工作流。</p><button id="open-studio" class="wide">打开完整工作流</button>
+<div id="angle-controls"><label class="slider-label">水平角度<output id="angle-yaw-value"></output></label><input id="angle-yaw" type="range" min="-180" max="180" step="1" value="0">
+<div class="fp-presets"><button data-angle-yaw="-60">左侧</button><button data-angle-yaw="-30">左前</button><button data-angle-yaw="0">正面</button><button data-angle-yaw="30">右前</button><button data-angle-yaw="60">右侧</button></div>
+<label class="slider-label">俯仰（正数为俯拍）<output id="angle-pitch-value"></output></label><input id="angle-pitch" type="range" min="-60" max="60" step="1" value="0">
+<label class="slider-label">镜头远近<output id="angle-zoom-value"></output></label><input id="angle-zoom" type="range" min="0.1" max="7" step="0.01" value="1">
+<button id="angle-from-view" class="wide">把观察角度用作镜头</button><p class="muted">转到侧面或背面时，模型会推测原图看不到的部分。</p></div>
+<img id="angle-preview" alt="最终构图的人偶示意"></section>
+<section><div class="section-heading"><h2>人物位置与朝向</h2><button class="text-button" id="fit-frame-2">撑满</button></div>
+<label class="slider-label">人物转身<output id="turn-value"></output></label><input id="turn" type="range" min="-180" max="180" step="1">
 <div class="fp-presets"><button data-turn="0">正面</button><button data-turn="45">左前</button><button data-turn="90">左侧</button><button data-turn="180">背面</button><button data-turn="-90">右侧</button><button data-turn="-45">右前</button></div>
 <label class="slider-label">大小<output id="zoom-value"></output></label><input id="zoom" type="range" min="0.2" max="6" step="0.01">
 <label class="slider-label">左右<output id="tx-value"></output></label><input id="tx" type="range" min="-20" max="20" step="0.05">
 <label class="slider-label">上下<output id="ty-value"></output></label><input id="ty" type="range" min="-20" max="20" step="0.05"></section>
-<section><div class="section-heading"><h2>人偶图尺寸</h2><small>仅 image1，与节点输出尺寸无关</small></div><div class="segmented ratios" id="ratios"><button data-ratio="person" title="和人物图同比例，多手多脚更少" hidden>人物图</button><button data-ratio="1:1">1:1</button><button data-ratio="3:4">3:4</button><button data-ratio="4:3">4:3</button><button data-ratio="9:16">9:16</button><button data-ratio="16:9">16:9</button></div><div class="dimensions"><label>宽<input id="output-width" type="number" min="64" max="4096" step="16"></label><label>高<input id="output-height" type="number" min="64" max="4096" step="16"></label></div></section>
-<section id="angle-section"><div class="section-heading"><h2>新机位 · AnyAngle</h2><label class="fp-switch"><input type="checkbox" id="angle-enabled">启用</label></div><p class="muted">姿势照常按正面生成，再用 AnyAngle 把整张图转到这个机位（需要机位工作流）。</p><div id="angle-controls" class="fp-disabled"><label class="slider-label">水平角度<output id="angle-yaw-value"></output></label><input id="angle-yaw" type="range" min="-180" max="180" step="1" value="0"><div class="fp-presets"><button data-angle-yaw="-60">左侧 60°</button><button data-angle-yaw="-30">左 30°</button><button data-angle-yaw="0">正面</button><button data-angle-yaw="30">右 30°</button><button data-angle-yaw="60">右侧 60°</button></div><label class="slider-label">俯仰（正数 = 从上往下看）<output id="angle-pitch-value"></output></label><input id="angle-pitch" type="range" min="-60" max="60" step="1" value="0"><button id="angle-from-view" class="wide">用视口的当前视角</button><img id="angle-preview" alt="新机位预览"></div></section>
+<details class="fp-advanced"><summary>姿势参考尺寸</summary><section><div class="section-heading"><h2>人偶图尺寸</h2><small>姿势参考尺寸；最终尺寸在节点设置</small></div><div class="segmented ratios" id="ratios"><button data-ratio="person" title="和人物图同比例，多手多脚更少" hidden>人物图</button><button data-ratio="1:1">1:1</button><button data-ratio="3:4">3:4</button><button data-ratio="4:3">4:3</button><button data-ratio="9:16">9:16</button><button data-ratio="16:9">16:9</button></div><div class="dimensions"><label>宽<input id="output-width" type="number" min="64" max="4096" step="16"></label><label>高<input id="output-height" type="number" min="64" max="4096" step="16"></label></div></section></details>
+
 </div>
 <div id="pose-panel" hidden>
 <section><div class="section-heading"><h2>选中关节</h2><span id="bone-name">未选择</span></div>
@@ -58,8 +81,8 @@
 <div id="proportion-panel" hidden>
 <section><div class="section-heading"><h2>头颈与四肢比例</h2><button class="text-button" id="reset-proportions">重置</button></div><div id="proportion-sliders"></div><p class="muted">100% 为默认比例，左右对称调整。改动后姿势保持不变，手脚位置会随骨长变化。</p></section>
 </div>
-<section class="description-section"><div class="section-heading"><h2>人偶图 · image1</h2><small id="preview-size"></small></div><img id="capture-preview" alt="人偶图预览"><div id="person-preview-wrap" hidden><div class="section-heading"><h2>人物图 · image2</h2></div><img id="person-preview" alt="人物图"></div></section>
-<section class="description-section"><div class="section-heading"><h2>提示词</h2><button id="copy-description" class="text-button">复制</button></div><label class="field-label">补充要求（建议英文）<textarea id="extra-prompt" placeholder="例如：keep the outfit, soft studio light"></textarea></label><p id="description"></p><span class="description-note">LoRA 训练指令固定，补充内容另起一行附在后面</span></section>
+<details class="fp-advanced"><summary>参考图与提示词</summary><section class="description-section"><div class="section-heading"><h2>内部姿势参考</h2><small id="preview-size"></small></div><img id="capture-preview" alt="人偶图预览"><div id="person-preview-wrap" hidden><div class="section-heading"><h2>人物照片</h2></div><img id="person-preview" alt="人物图"></div></section>
+<section class="description-section"><div class="section-heading"><h2>提示词</h2><button id="copy-description" class="text-button">复制</button></div><label class="field-label">补充要求（建议英文）<textarea id="extra-prompt" placeholder="例如：keep the outfit, soft studio light"></textarea></label><p id="description"></p><span class="description-note">补充要求会在生成时一并使用</span></section></details>
 </aside></main>
-<footer class="app-footer"><span>Fisher Pose <span class="footer-dot">/</span> Free Pose · mannequin core © MiuProject (MIT)</span><span>人偶图 → image_1，人物图 → image_2</span></footer>
-<script type="module" src="freepose.mjs?v=20260930-5"></script></body></html>
+<footer class="app-footer"><span>Fisher Pose <span class="footer-dot">/</span> Free Pose · mannequin core © MiuProject (MIT)</span><span>调整完成后点「应用并生成」</span></footer>
+<script type="module" src="freepose.mjs?v=20261007-review1"></script></body></html>

@@ -49,7 +49,8 @@ def camera_info(angle_camera, center, height, width, image_height):
     direction = EDITOR_TO_SPLAT @ forward
     direction = direction / direction.norm().clamp_min(1e-6)
     target = position + direction * float(position_rel.norm()) * height
-    fov = float(angle_camera.get("fov", 35.0))
+    fov = math.degrees(2 * math.atan(math.tan(math.radians(float(angle_camera.get("fov", 35.0))) / 2)
+                                    / max(float(angle_camera.get("zoom", 1.0)), 0.01)))
     if width < image_height:
         # RenderSplat applies the field of view across the shorter side; the editor's is vertical.
         fov = math.degrees(2 * math.atan(math.tan(math.radians(fov) / 2) * width / image_height))
@@ -95,9 +96,9 @@ class FisherAnyAngleCamera:
                    "AnyAngle 那一步的 TextEncodeQwenImage21：正面结果接 image1、粗渲染接 image2，提示词接本节点，CFG 1、25 步。")
 
     def camera(self, splat, pose_json, image):
-        angle = (json.loads(pose_json or "{}").get("anyAngle") or {})
-        if not angle.get("enabled") or not angle.get("camera"):
-            raise ValueError("自由姿势编辑器里没有设置新机位：打开编辑器，在「输出」里启用「新机位 · AnyAngle」，调好角度后点「应用到节点」。")
+        angle = shot_of(pose_json)
+        if not angle:
+            raise ValueError("尚未设置新机位。请使用完整工作流，在编辑器「定镜头」中调整角度后应用；正面应由「Fisher 最终图像」自动跳过此分支。")
         center, height = robust_box(splat_points(splat))
         if height <= 1e-6:
             raise ValueError("高斯溅射是空的：检查人物抠图（RemoveBackground）是否抠到了人。")
@@ -105,3 +106,109 @@ class FisherAnyAngleCamera:
         camera = camera_info(angle["camera"], center, height, width, image_height)
         coarse = render_coarse(splat, camera, width, image_height)[..., :3].float().cpu().clamp(0, 1)
         return {"ui": {"images": save_preview(coarse)}, "result": (coarse, ANYANGLE_PROMPT, camera)}
+
+
+def shot_of(pose_json):
+    """The saved camera shot when it needs the camera branch (turned on and placed), else {}."""
+    try:
+        angle = json.loads(pose_json or "{}").get("anyAngle") or {}
+    except (ValueError, AttributeError):
+        return {}
+    return angle if angle.get("enabled") and angle.get("camera") else {}
+
+
+SHOT_KEYS = ("anyAngle", "shotPreviewFile")
+
+
+class FisherShot:
+    """Holds the camera shot apart from the pose (the editor's host writes both).
+
+    The pose node's inputs only change when the pose does, so trying another camera angle reuses
+    the cached front result and its 3D reconstruction instead of generating a new front image.
+    """
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {"required": {
+            "pose_json": ("STRING", {"forceInput": True}),
+            "shot_json": ("STRING", {"default": "{}", "multiline": True}),
+        }}
+
+    RETURN_TYPES = ("STRING",)
+    RETURN_NAMES = ("姿势与镜头",)
+    FUNCTION = "merge"
+    CATEGORY = "Fisher/姿态与机位"
+    DESCRIPTION = "保存编辑器里定好的镜头，与姿势合并后交给机位和最终图像节点。只改镜头时，正面图和 3D 重建直接复用。"
+
+    def merge(self, pose_json, shot_json):
+        data = json.loads(pose_json or "{}")
+        shot = json.loads(shot_json or "{}")
+        for key in SHOT_KEYS:
+            if key in shot:
+                data[key] = shot[key]
+        return (json.dumps(data, ensure_ascii=False),)
+
+
+class FisherPoseResult:
+    """Only evaluate the camera branch when the saved shot actually needs it."""
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {"required": {
+            "pose_json": ("STRING", {"forceInput": True}),
+            "front_image": ("IMAGE", {"lazy": True}),
+        }, "optional": {
+            # Optional: with a front shot the editor's host mutes the whole camera branch, so the
+            # TripoSplat / AnyAngle models are not needed (nor validated) for front-only runs.
+            "camera_image": ("IMAGE", {"lazy": True}),
+        }, "hidden": {"prompt": "PROMPT", "unique_id": "UNIQUE_ID"}}
+
+    RETURN_TYPES = ("IMAGE",)
+    RETURN_NAMES = ("最终图像",)
+    FUNCTION = "select"
+    CATEGORY = "Fisher/姿态与机位"
+    DESCRIPTION = "按编辑器保存的镜头自动选择结果。正面直接出图，调整镜头后自动换机位，无需手动切换工作流。"
+
+    @staticmethod
+    def camera_linked(prompt, unique_id):
+        try:
+            return "camera_image" in prompt[str(unique_id)]["inputs"]
+        except (KeyError, TypeError):
+            return True
+
+    def check_lazy_status(self, pose_json, front_image=None, camera_image=None, prompt=None, unique_id=None):
+        if shot_of(pose_json):
+            # Never ask for an unlinked input: ComfyUI would wait for it forever.
+            return ["camera_image"] if camera_image is None and self.camera_linked(prompt, unique_id) else []
+        return ["front_image"] if front_image is None else []
+
+    def select(self, pose_json, front_image=None, camera_image=None, prompt=None, unique_id=None):
+        if not shot_of(pose_json):
+            return (front_image,)
+        if camera_image is None:
+            raise ValueError("保存的是新机位镜头，但换机位分支被关闭或没有连线：打开编辑器点一次「应用」，或在「定镜头」里点「恢复正面」。")
+        return (camera_image,)
+
+
+class FisherAnyAngleEncode:
+    """Fixed required inputs prevent autogrow image slots from dropping camera conditioning."""
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {"required": {
+            "clip": ("CLIP",), "vae": ("VAE",),
+            "front_image": ("IMAGE",), "camera_image": ("IMAGE",),
+            # 0 = keep the front result's own size (rounded to 32), so the new angle matches the node's width/height.
+            "resolution": ("INT", {"default": 0, "min": 0, "max": 2048, "step": 32}),
+        }}
+
+    RETURN_TYPES = ("CONDITIONING", "CONDITIONING", "LATENT")
+    RETURN_NAMES = ("正向", "负向", "latent")
+    FUNCTION = "encode"
+    CATEGORY = "Fisher/姿态与机位"
+
+    def encode(self, clip, vae, front_image, camera_image, resolution):
+        from comfy_extras.nodes_qwen import TextEncodeQwenImage21
+        return TextEncodeQwenImage21.execute(
+            clip=clip, vae=vae, prompt=ANYANGLE_PROMPT, negative_prompt="",
+            resolution=resolution, images={"image_1": front_image, "image_2": camera_image},
+        ).result

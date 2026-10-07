@@ -1,5 +1,5 @@
 // Pose + new camera angle end to end on the AnyAngle workflow (needs all Qwen 2.1, VNCCS, TripoSplat and
-// AnyAngle models). Run with --workflow "workflows/Fisher-Qwen2.1-自由姿势+机位-AnyAngle.json".
+// AnyAngle models). Run with --workflow "workflows/Fisher-Pose-Studio.json".
 (async () => {
   const sleep = ms => new Promise(r => setTimeout(r, ms));
   const app = window.app;
@@ -18,7 +18,7 @@
   if (!fp?.viewer?.skinnedMesh) return JSON.stringify({ editorNotReady: d?.querySelector('#loading-text')?.textContent });
   fp.applyCommonPose(fp.galleries.common.find(e => e.spec.id === (window.__pose || 'hands-up')));
   for (const [id, value] of [['#output-width', 1024], ['#output-height', 1024]]) { const i = d.querySelector(id); i.value = value; i.dispatchEvent(new Event('change')); }
-  d.querySelector('#angle-enabled').click();
+  fp.setEditMode('camera');
   for (const [id, value] of [['#angle-yaw', window.__yaw ?? 40], ['#angle-pitch', window.__pitch ?? 20]]) { const i = d.querySelector(id); i.value = value; i.dispatchEvent(new Event('input')); }
   await sleep(800);
   const report = { anglePreview: !!d.querySelector('#angle-preview').getAttribute('src') };
