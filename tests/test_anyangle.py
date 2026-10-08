@@ -19,6 +19,19 @@ def fake_splat(world_points):
     return SimpleNamespace(positions=stored.unsqueeze(0), counts=None)
 
 
+def camera_latent(direction=(1, 0, 0)):
+    token = torch.tensor([[list(direction) + [0.15, 0.8]]], dtype=torch.float32)
+    return {"samples": SimpleNamespace(is_nested=True, unbind=lambda: [torch.zeros(1, 8, 16), token])}
+
+
+def rotate_vector(quaternion, vector):
+    # Quaternion-vector multiplication, independent of the production matrix conversion.
+    q = torch.tensor([quaternion[k] for k in ('x', 'y', 'z')])
+    vector = torch.as_tensor(vector, dtype=torch.float32)
+    cross = 2 * torch.linalg.cross(q, vector)
+    return vector + quaternion['w'] * cross + torch.linalg.cross(q, cross)
+
+
 def person(height=1.0, center=(0.1, 0.2, -0.05), n=4000):
     g = torch.Generator().manual_seed(0)
     pts = (torch.rand(n, 3, generator=g) - 0.5) * torch.tensor([0.4, height, 0.2]) + torch.tensor(center)
@@ -38,11 +51,12 @@ class AnyAngleCameraTests(unittest.TestCase):
     def camera(self, **kwargs):
         points = kwargs.pop("points", person())
         size = kwargs.pop("size", (1024, 1024))
-        coarse, prompt, info = anyangle.FisherAnyAngleCamera().camera(fake_splat(points), pose_json(**kwargs), torch.zeros(1, size[1], size[0], 3))["result"]
+        latent = kwargs.pop('latent', camera_latent())
+        coarse, prompt, info = anyangle.FisherAnyAngleCamera().camera(fake_splat(points), pose_json(**kwargs), torch.zeros(1, size[1], size[0], 3), latent)["result"]
         return info, coarse.shape[2], coarse.shape[1], prompt
 
     def test_coarse_render_is_a_plain_image(self):
-        coarse = anyangle.FisherAnyAngleCamera().camera(fake_splat(person()), pose_json([0, 0, 2.5], [0, 0, -1]), torch.zeros(1, 64, 96, 3))["result"][0]
+        coarse = anyangle.FisherAnyAngleCamera().camera(fake_splat(person()), pose_json([0, 0, 2.5], [0, 0, -1]), torch.zeros(1, 64, 96, 3), camera_latent())["result"][0]
         self.assertEqual(tuple(coarse.shape), (1, 64, 96, 3))
         self.assertEqual(coarse.dtype, torch.float32)
         self.assertGreaterEqual(float(coarse.min()), 0.0)
@@ -86,6 +100,61 @@ class AnyAngleCameraTests(unittest.TestCase):
     def test_render_matches_the_front_result_size(self):
         self.assertEqual(anyangle.render_size(1920, 1088), (1920, 1088))
         self.assertEqual(anyangle.render_size(4096, 2048), (2048, 1024))  # RenderSplat's limit
+
+
+class SourceCameraTests(unittest.TestCase):
+    def test_front_follows_predicted_source_instead_of_a_fixed_90_degrees(self):
+        # Known decoder/world axes: raw +X -> world +X, raw -Y -> world +Z,
+        # raw +Z -> world +Y. Vary the source per image, including elevated views.
+        for raw, world in [((1, 0, 0), (1, 0, 0)), ((0, -1, 0), (0, 0, 1)),
+                           ((0, 1, 0), (0, 0, -1)), ((0, -1, 1), (0, 1, 1))]:
+            with self.subTest(raw=raw):
+                basis = anyangle.reference_basis(camera_latent(raw))
+                expected = torch.tensor(world, dtype=torch.float32)
+                expected /= expected.norm()
+                camera = {'position': [0, 0, 3], 'forward': [0, 0, -1]}
+                info = anyangle.camera_info(camera, torch.zeros(3), 1, 512, 512, basis)
+                actual = torch.tensor(list(info['position'].values()))
+                torch.testing.assert_close(actual, 3 * expected)
+                torch.testing.assert_close(rotate_vector(info['quaternion'], [0, 0, 1]), expected)
+
+    def test_editor_rotations_are_relative_to_source_even_when_elevated(self):
+        for raw in [(1, 0, 0), (0, -1, 1), (.7144, -.5352, .2957)]:
+            basis = anyangle.reference_basis(camera_latent(raw))
+            for yaw, pitch in [(45, 0), (90, 0), (-90, 0), (180, 0), (0, 45), (35, -30)]:
+                with self.subTest(raw=raw, yaw=yaw, pitch=pitch):
+                    y, p = math.radians(yaw), math.radians(pitch)
+                    back = torch.tensor([math.sin(y)*math.cos(p), math.sin(p), math.cos(y)*math.cos(p)])
+                    camera = {'position': (3 * back).tolist(), 'forward': (-back).tolist()}
+                    info = anyangle.camera_info(camera, torch.zeros(3), 1, 512, 512, basis)
+                    # Undo source orientation: both the sight line AND screen-right must match
+                    # the editor, otherwise elevated inputs gain unwanted roll.
+                    local_back = basis.T @ rotate_vector(info['quaternion'], [0, 0, 1])
+                    local_right = basis.T @ rotate_vector(info['quaternion'], [1, 0, 0])
+                    torch.testing.assert_close(local_back, back, atol=1e-6, rtol=1e-5)
+                    torch.testing.assert_close(local_right, torch.tensor([math.cos(y), 0, -math.sin(y)]), atol=1e-6, rtol=1e-5)
+
+    def test_height_and_framing_are_measured_in_source_camera_frame(self):
+        basis = anyangle.reference_basis(camera_latent((0, -1, 1)))
+        points = torch.tensor(person(height=3, center=(0, 0, 0))) @ basis.T
+        info = AnyAngleCameraTests().camera(position=[0, 0, 2], forward=[0, 0, -1],
+            points=points.tolist(), latent=camera_latent((0, -1, 1)))[0]
+        distance = torch.tensor(list(info['position'].values())).norm()
+        self.assertAlmostEqual(float(distance), 6, delta=.15)
+
+    def test_missing_source_camera_does_not_silently_guess(self):
+        with self.assertRaisesRegex(ValueError, '最新版工作流'):
+            anyangle.reference_basis(None)
+        with self.assertRaisesRegex(ValueError, 'TripoSplat'):
+            anyangle.reference_basis({'samples': torch.zeros(1, 64, 8, 8)})
+
+    def test_invalid_source_camera_is_reported(self):
+        for direction in [(0, 0, 0), (float('nan'), 1, 0)]:
+            with self.assertRaisesRegex(ValueError, '机位无效'):
+                anyangle.reference_basis(camera_latent(direction))
+        bad = {'samples': SimpleNamespace(is_nested=True, unbind=lambda: [torch.zeros(1, 8, 16)])}
+        with self.assertRaisesRegex(ValueError, '5 维'):
+            anyangle.reference_basis(bad)
 
 
 class ResultSelectionTests(unittest.TestCase):
@@ -154,7 +223,7 @@ class ShotTests(unittest.TestCase):
 
     def test_editor_zoom_is_preserved_in_render_fov(self):
         camera = {"position": [0, 0, 2], "forward": [0, 0, -1], "fov": 35, "zoom": 2}
-        info = anyangle.camera_info(camera, torch.zeros(3), 1, 1024, 1024)
+        info = anyangle.camera_info(camera, torch.zeros(3), 1, 1024, 1024, torch.eye(3))
         expected = math.degrees(2 * math.atan(math.tan(math.radians(17.5)) / 2))
         self.assertAlmostEqual(info['fov'], expected)
 

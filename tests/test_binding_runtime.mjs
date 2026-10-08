@@ -10,14 +10,14 @@ test('updated frontend rejects old running backend even when Qwen is supported',
 });
 
 test('loaded binding capability allows a group workflow', async () => {
-    await verifyBindingRuntime(prompt(group), async () => ({ freePoseBindingVersion: 1 }));
+    await verifyBindingRuntime(prompt(group), async () => ({ freePoseBindingVersion: 2 }));
 });
 
 test('each run checks the process again after a server restart', async () => {
-    let version = 1;
+    let version = 2;
     const fetchEnvironment = async () => ({ freePoseBindingVersion: version });
     await verifyBindingRuntime(prompt(group), fetchEnvironment);
-    version = 0;
+    version = 1;
     await assert.rejects(verifyBindingRuntime(prompt(group), fetchEnvironment), /未加载/);
 });
 

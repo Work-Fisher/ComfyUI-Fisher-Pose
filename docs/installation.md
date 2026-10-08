@@ -17,6 +17,8 @@
 
 统一工作流已加入镜头独立保存、缓存复用、多角度开关和独立宽高常量，旧工作流不会因插件更新自动获得新连线。请另存自己的旧工作流后导入新版，再选择人物图与模型。下载新文件后重启 ComfyUI，并强制刷新浏览器（Ctrl+F5）。本次开关与尺寸控制不增加模型或第三方插件；若提示 `PrimitiveInt` / `PrimitiveBoolean` 缺失，请更新 ComfyUI 核心。
 
+**2026-10-08 机位校准更新**：换机位现在读取 TripoSplat 为当前图像预测的原始机位，修复部分图片转角很大却几乎不变的问题。必须同时更新插件和工作流：新版已将「TripoSplat 采样」的 `latent` 接到「按新机位渲染参考」的 `camera_latent`。保留旧工作流时也可手动补这根线；不要连接正面采样或重建前的空 latent。此次修复不增加模型。
+
 ## 安装与依赖插件
 
 | 项目 | 是否需要 | 链接与用途 |
@@ -46,7 +48,7 @@ ZIP 安装请下载新版，备份旧插件文件夹后替换；不要让 `custo
 
 从网盘下载的请确认 `web/vnccs/assets/pose_studio_makehuman.v2.bin`（约 86MB）存在。它是插件附带的人偶资源，不是要放进 models 的生图模型；缺失时从本仓库完整下载插件。
 
-安装完成后重启 ComfyUI、Ctrl+F5 刷新页面，导入 [Fisher-Pose-Studio.json](../workflows/Fisher-Pose-Studio.json)。工作流自带的 `example.png` 是占位文件，请选择自己的照片。
+安装完成后重启 ComfyUI、Ctrl+F5 刷新页面，导入 [【Work-Fisher】无限姿势+无限视角（支持双人）.json](../workflows/【Work-Fisher】无限姿势+无限视角（支持双人）.json)。默认接好两张单人照；`person_1.png`、`person_2.png` 是占位文件名，请分别上传自己的照片。工作流已内置人偶参考和镜头预览，不依赖作者电脑上的图片；切换为合照或单人见[人物输入方式](usage.md#人物输入方式)。
 
 ### 基础生图模型（单人、双人都需要）
 

@@ -6,7 +6,7 @@
 
 在 ComfyUI 中编辑单人或双人姿势，用 Qwen Image 2.1 生成对应画面。
 
-[下载插件](https://github.com/Work-Fisher/ComfyUI-Fisher-Pose/archive/refs/heads/main.zip) · [下载工作流](https://raw.githubusercontent.com/Work-Fisher/ComfyUI-Fisher-Pose/main/workflows/Fisher-Pose-Studio.json)
+[下载插件](https://github.com/Work-Fisher/ComfyUI-Fisher-Pose/archive/refs/heads/main.zip) · [下载工作流](https://raw.githubusercontent.com/Work-Fisher/ComfyUI-Fisher-Pose/main/workflows/【Work-Fisher】无限姿势+无限视角（支持双人）.json)
 
 [安装与模型](docs/installation.md) · [使用指南](docs/usage.md)
 
@@ -71,10 +71,11 @@ https://github.com/user-attachments/assets/24dc201a-d9dc-4ac7-86a8-acc9d8f6dd7c
 
 | 1 · 选人物 | 2 · 摆姿势、定镜头 | 3 · 应用并生成 |
 |---|---|---|
-| 选择单人照片或完整合照 | 选预设、拖关节；需要时切到「定镜头」 | 查看机位预览，再运行生成 |
+| 默认分别上传两张单人照，也可切换为合照或单人 | 选预设、拖关节；需要时切到「定镜头」 | 查看机位预览，再运行生成 |
 
-先按 [安装指南](docs/installation.md) 准备环境，导入唯一的最新版工作流 [Fisher-Pose-Studio.json](workflows/Fisher-Pose-Studio.json)。
+先按 [安装指南](docs/installation.md) 准备环境，导入唯一的最新版工作流 [【Work-Fisher】无限姿势+无限视角（支持双人）.json](workflows/【Work-Fisher】无限姿势+无限视角（支持双人）.json)。
 
+- **两张单人照已接好**：分别在「人物 1」「人物 2」上传照片。人偶 1 张开双臂、人偶 2 挥手，姿势参考已内置，无需拷贝作者的 input 文件。合照和单人用法见[人物输入方式](docs/usage.md#人物输入方式)。
 - **多角度开关关闭**：只生成正面人物姿势图，仅需基础模型。
 - **多角度开关开启**：按保存的镜头运行完整流程；只改镜头时复用上一次正面结果与 3D 重建。
 - **输出尺寸**：上方两个整数常量分别控制宽、高，与编辑器内的人偶图尺寸独立。
@@ -113,6 +114,8 @@ https://github.com/user-attachments/assets/24dc201a-d9dc-4ac7-86a8-acc9d8f6dd7c
 | 从旧版本升级 | [需要更新什么、哪些模型可以复用](docs/installation.md#老用户升级需要重新下载什么) |
 
 **老用户注意：更新插件后重新导入新版工作流，重启 ComfyUI 并刷新浏览器。** 已有且完整的同版本模型无需重复下载。
+
+机位校准更新需要新版工作流中的 `camera_latent` 连线，解决部分重建转角与预览不符、换机位后仍接近正面的问题；详见[升级说明](docs/installation.md#老用户升级需要重新下载什么)。
 
 [常见问题](docs/usage.md#常见问题) · [已知限制](docs/usage.md#已知限制) · [原自由视角模式](docs/自由视角详细说明.md)
 

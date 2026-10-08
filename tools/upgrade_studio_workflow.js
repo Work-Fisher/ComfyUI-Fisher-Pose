@@ -1,5 +1,5 @@
-// One-off migration of workflows/Fisher-Pose-Studio.json, run in the real frontend with
-//   python tests/e2e/cdp_run.py tools/upgrade_studio_workflow.js --workflow workflows/Fisher-Pose-Studio.json
+// One-off migration of workflows/【Work-Fisher】无限姿势+无限视角（支持双人）.json, run in the real frontend with
+//   python tests/e2e/cdp_run.py tools/upgrade_studio_workflow.js --workflow workflows/【Work-Fisher】无限姿势+无限视角（支持双人）.json
 // Inserts the FisherShot node, fixes seeds so a shot-only change reuses the front result, keeps the
 // AnyAngle latent at the front size, previews the front result, mutes the camera branch (front is the
 // default shot) and drops machine-specific properties. Returns the serialized workflow.
@@ -12,6 +12,8 @@
   const input = (node, name) => node.inputs.findIndex(i => i.name === name);
   const set = (node, name, value) => { const w = node.widgets.find(w => w.name === name); if (!w) throw new Error(`${node.type}.${name}`); w.value = value; };
   const origin = (node, name) => graph.getNodeById(graph.links[node.inputs[input(node, name)].link].origin_id);
+  const splatDecoder = origin(camera, 'splat');
+  origin(splatDecoder, 'samples').connect(0, camera, input(camera, 'camera_latent'));
 
   // 1. Shot node between the pose output and its consumers.
   const shot = LiteGraph.createNode('FisherShot');

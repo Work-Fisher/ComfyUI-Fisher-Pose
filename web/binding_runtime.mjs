@@ -1,5 +1,5 @@
 // Match env_check.py's capability from the running backend, not files on disk.
-const REQUIRED_BINDING_VERSION = 1;
+const REQUIRED_BINDING_VERSION = 2;
 
 export function isGroupPose(data, secondReference = false) {
     return Array.isArray(data?.people) && data.people.length > 1

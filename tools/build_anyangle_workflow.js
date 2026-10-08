@@ -1,8 +1,8 @@
-// Legacy two-stage builder for tests/fixtures only. Do not run on Fisher-Pose-Studio.json, which
+// Legacy two-stage builder for tests/fixtures only. Do not run on 【Work-Fisher】无限姿势+无限视角（支持双人）.json, which
 // already includes the camera branch and selects the final image with FisherPoseResult.
 (async () => {
   const app = window.app, graph = app.graph;
-  if (graph._nodes.some(n => n.type === "FisherAnyAngleCamera")) throw new Error("Camera branch already exists; use the shipped Fisher-Pose-Studio.json.");
+  if (graph._nodes.some(n => n.type === "FisherAnyAngleCamera")) throw new Error("Camera branch already exists; use the shipped 【Work-Fisher】无限姿势+无限视角（支持双人）.json.");
   const byType = type => graph._nodes.find(n => (n.comfyClass || n.type) === type);
   const unet = byType('UNETLoader'), clip = byType('CLIPLoader'), vae = byType('VAELoader'), pose = byType('FisherQwenFreePose');
   const decoded = byType('VAEDecode');
@@ -46,6 +46,7 @@
 
   // Camera from the editor; the node renders the coarse view itself (and previews it).
   const camera = add('FisherAnyAngleCamera', 1380, 200, {}, 'Fisher AnyAngle 机位（出粗渲染）');
+  link(splatSampler, 0, camera, 'camera_latent');
   link(splat, 0, camera, 'splat'); link(pose, pose.outputs.findIndex(o => o.name === '姿势数据'), camera, 'pose_json'); link(decoded, 0, camera, 'image');
   const render = camera;  // output 0 = 粗渲染
   const coarse = add('PreviewImage', 1720, 0, {}, '粗渲染（新机位）');

@@ -78,7 +78,9 @@ function instructionText() {
     if (doc.referenceMode === 'group') {
         // Keep the prompt consistent with the visible source-photo identity labels.
         const [sourceFirst, sourceSecond] = doc.swapPeople ? ['right', 'left'] : ['left', 'right'];
-        return `Draw the person on the ${sourceFirst} side of the original group photo in image2 in the pose and position of the ${first} mannequin in image1, and the person on the ${sourceSecond} side of the original group photo in image2 in the pose and position of the ${second} mannequin in image1. Generate exactly two people, one per mannequin. Preserve each reference person's face, hairstyle, glasses and clothing. Replace their original poses completely. Do not duplicate anyone.`;
+        const [leftSource, rightSource] = first === 'left' ? [sourceFirst, sourceSecond] : [sourceSecond, sourceFirst];
+        const order = leftSource === 'left' ? 'Keep' : 'Exchange';
+        return `Draw character from image2. Repose the existing two people in image2 to match image1. ${order} their left-to-right order: the person on the viewer's ${leftSource} in image2 takes the left mannequin pose in image1; the person on the viewer's ${rightSource} takes the right mannequin pose. Preserve their appearances and the scene.`;
     }
     return `Draw the ${first} character from image2 in the pose of the ${first} mannequin in image1, and the ${second} character from image3 in the pose of the ${second} mannequin in image1.`;
 }

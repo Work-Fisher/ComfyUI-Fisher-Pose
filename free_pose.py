@@ -29,9 +29,8 @@ def people_sides(pose_json):
 
 
 def instruction(pose_json=None, reference_mode=None):
-    # The LoRA was trained on one person. With two, naming each mannequin by its side and asking for its
-    # pose is what made both people follow their poses in testing (2026-09-30); a bare
-    # "character from image2 and character from image3" kept both people standing.
+    # Whole-photo edits and separate portraits need different instructions.
+    # Text mapping guides generation; it is not a hard per-person identity constraint.
     sides = people_sides(pose_json)
     if not sides:
         return SINGLE_PERSON_INSTRUCTION
@@ -42,10 +41,14 @@ def instruction(pose_json=None, reference_mode=None):
         # Match the identity binding shown in the editor. A model result that ignores
         # this instruction must not invert the meaning for every subsequent pose.
         source_first, source_second = ('right', 'left') if data.get('swapPeople') else ('left', 'right')
-        return (f"Draw the person on the {source_first} side of the original group photo in image2 in the pose and position of the {first} mannequin in image1, "
-                f"and the person on the {source_second} side of the original group photo in image2 in the pose and position of the {second} mannequin in image1. "
-                "Generate exactly two people, one per mannequin. Preserve each reference person's face, hairstyle, glasses and clothing. "
-                "Replace their original poses completely. Do not duplicate anyone.")
+        left_source, right_source = (source_first, source_second) if first == 'left' else (source_second, source_first)
+        order = 'Keep' if left_source == 'left' else 'Exchange'
+        # Keep the VNCCS trigger, and edit the existing pair as one scene. The former
+        # pair of "Draw the person ... and ..." clauses duplicated the group in a
+        # captured raised-leg case. Seeded image regressions are recorded in docs.
+        return (f"{VNCCS_INSTRUCTION}. Repose the existing two people in image2 to match image1. "
+                f"{order} their left-to-right order: the person on the viewer's {left_source} in image2 takes the left mannequin pose in image1; "
+                f"the person on the viewer's {right_source} takes the right mannequin pose. Preserve their appearances and the scene.")
     return (f"Draw the {first} character from image2 in the pose of the {first} mannequin in image1, "
             f"and the {second} character from image3 in the pose of the {second} mannequin in image1.")
 

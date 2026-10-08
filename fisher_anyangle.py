@@ -3,11 +3,12 @@
 The free-pose editor stores the new camera relative to the people, in units of their height
 (pose_json["anyAngle"]["camera"]). The workflow turns the front-view result into a Gaussian splat
 (TripoSplat, ComfyUI core); this node places that camera on the splat for RenderSplat.
+The sampled LATENT also carries the predicted source camera. SPLAT alone loses that
+reference frame, so the same editor angle otherwise means different things per image.
 
 Image order, measured 2026-09-30: the front result must be image1 and the coarse render image2 (as in
 ComfyUI's own AnyAngle workflow and AnyAngle Studio T8); with the model card's order (render = image1)
-the camera did not move. Sampling seed 0 burnt this combination (harsh, oversaturated) while seeds 7 and
-12345 were clean, so the workflow defaults to seed 42 and randomizes.
+the camera did not move. The workflow uses a fixed seed for repeatable comparisons.
 """
 import json
 import math
@@ -15,10 +16,54 @@ import math
 import torch
 
 ANYANGLE_PROMPT = "Change the camera angle from <image2> to <image1>."
-# TripoSplat reconstructs the input view as seen from world yaw +90° (measured 2026-09-30: an orbit at
-# yaw 90 reproduces the input image, unmirrored). The editor's front is yaw 0, so its offsets rotate
-# by +90° about +Y: (x, y, z) -> (z, y, -x).
-EDITOR_TO_SPLAT = torch.tensor([[0.0, 0.0, 1.0], [0.0, 1.0, 0.0], [-1.0, 0.0, 0.0]])
+
+def view_basis(back):
+    """Three.js camera axes: +X right, +Y up, +Z away from the target."""
+    back = back / back.norm().clamp_min(1e-8)
+    world_up = torch.tensor([0.0, 1.0, 0.0])
+    if abs(float(back[1])) > 0.999999:
+        world_up = torch.tensor([0.0, 0.0, 1.0])
+    right = torch.linalg.cross(world_up, back)
+    right = right / right.norm()
+    return torch.stack((right, torch.linalg.cross(back, right), back), dim=1)
+
+
+def rotation_quaternion(rotation):
+    """Stable matrix -> xyzw, including 180-degree camera turns."""
+    m = rotation.tolist()
+    trace = m[0][0] + m[1][1] + m[2][2]
+    if trace > 0:
+        scale = math.sqrt(trace + 1.0) * 2
+        values = [(m[2][1] - m[1][2]) / scale, (m[0][2] - m[2][0]) / scale,
+                  (m[1][0] - m[0][1]) / scale, scale / 4]
+    else:
+        i = max(range(3), key=lambda axis: m[axis][axis])
+        j, k = (i + 1) % 3, (i + 2) % 3
+        scale = math.sqrt(max(0.0, 1.0 + m[i][i] - m[j][j] - m[k][k])) * 2
+        values = [0.0] * 4
+        values[i], values[j], values[k], values[3] = (scale / 4, (m[i][j] + m[j][i]) / scale,
+            (m[i][k] + m[k][i]) / scale, (m[k][j] - m[j][k]) / scale)
+    norm = math.sqrt(sum(v * v for v in values))
+    return dict(zip(("x", "y", "z", "w"), (v / norm for v in values)))
+
+
+def reference_basis(camera_latent):
+    """Editor front axes in the reconstructed scene, from TripoSplat's predicted source camera."""
+    if camera_latent is None:
+        raise ValueError("缺少重建原始机位：请导入最新版工作流，或将 TripoSplat 采样的 latent 接到「按新机位渲染参考」的 camera_latent。")
+    samples = camera_latent["samples"]
+    if not getattr(samples, "is_nested", False):
+        raise ValueError("camera_latent 必须连接 TripoSplat 采样输出，不能使用正面生图的 latent。")
+    streams = samples.unbind()
+    if len(streams) != 2 or streams[1].shape[-2:] != (1, 5):
+        raise ValueError("TripoSplat 采样结果缺少 5 维原始机位，请更新 ComfyUI 并重新采样。")
+    direction = streams[1][0, 0, :3].detach().float().cpu()
+    # Official camera token is [dx,dy,dz,k,w] in Z-up coordinates. The decoder applies
+    # (x,y,z)->(x,-z,y), then RenderSplat world coordinates apply (x,y,z)->(x,-y,-z).
+    back = direction[[0, 2, 1]] * torch.tensor([1.0, 1.0, -1.0])
+    if not torch.isfinite(back).all() or back.norm() < 1e-6:
+        raise ValueError("重建原始机位无效，请重新运行 TripoSplat 采样。")
+    return view_basis(back)
 
 
 def splat_points(splat):
@@ -42,20 +87,24 @@ def render_size(width, height, limit=2048):
     return max(64, round(width * scale / 8) * 8), max(64, round(height * scale / 8) * 8)
 
 
-def camera_info(angle_camera, center, height, width, image_height):
+def camera_info(angle_camera, center, height, width, image_height, basis):
     position_rel = torch.tensor([float(v) for v in angle_camera["position"]])
     forward = torch.tensor([float(v) for v in angle_camera["forward"]])
-    position = center + EDITOR_TO_SPLAT @ position_rel * height
-    direction = EDITOR_TO_SPLAT @ forward
+    position = center + basis @ position_rel * height
+    direction = basis @ forward
     direction = direction / direction.norm().clamp_min(1e-6)
     target = position + direction * float(position_rel.norm()) * height
+    # Transform the whole frame. Global-Y lookAt would introduce roll errors when
+    # the reconstructed source camera has elevation.
+    quaternion = rotation_quaternion(basis @ view_basis(-forward))
     fov = math.degrees(2 * math.atan(math.tan(math.radians(float(angle_camera.get("fov", 35.0))) / 2)
                                     / max(float(angle_camera.get("zoom", 1.0)), 0.01)))
     if width < image_height:
         # RenderSplat applies the field of view across the shorter side; the editor's is vertical.
         fov = math.degrees(2 * math.atan(math.tan(math.radians(fov) / 2) * width / image_height))
     as_dict = lambda v: {"x": float(v[0]), "y": float(v[1]), "z": float(v[2])}
-    return {"position": as_dict(position), "target": as_dict(target), "fov": fov, "zoom": 1.0, "cameraType": "perspective"}
+    return {"position": as_dict(position), "target": as_dict(target), "quaternion": quaternion,
+            "fov": fov, "zoom": 1.0, "cameraType": "perspective"}
 
 
 def save_preview(image):
@@ -86,6 +135,8 @@ class FisherAnyAngleCamera:
             "splat": ("SPLAT",),
             "pose_json": ("STRING", {"forceInput": True}),
             "image": ("IMAGE", {"tooltip": "第一步的正面结果：粗渲染按它的尺寸出图"}),
+        }, "optional": {
+            "camera_latent": ("LATENT", {"tooltip": "连接 TripoSplat 采样的 latent；其中的原始机位用于校准转角，不能接正面采样。"}),
         }}
 
     RETURN_TYPES = ("IMAGE", "STRING", "LOAD3D_CAMERA")
@@ -95,15 +146,17 @@ class FisherAnyAngleCamera:
     DESCRIPTION = ("把自由姿势编辑器里设的「新机位 · AnyAngle」放到高斯溅射上并渲出粗图。"
                    "AnyAngle 那一步的 TextEncodeQwenImage21：正面结果接 image1、粗渲染接 image2，提示词接本节点，CFG 1、25 步。")
 
-    def camera(self, splat, pose_json, image):
+    def camera(self, splat, pose_json, image, camera_latent=None):
         angle = shot_of(pose_json)
         if not angle:
             raise ValueError("尚未设置新机位。请使用完整工作流，在编辑器「定镜头」中调整角度后应用；正面应由「Fisher 最终图像」自动跳过此分支。")
-        center, height = robust_box(splat_points(splat))
+        basis = reference_basis(camera_latent)
+        center, height = robust_box(splat_points(splat) @ basis)
+        center = basis @ center
         if height <= 1e-6:
             raise ValueError("高斯溅射是空的：检查人物抠图（RemoveBackground）是否抠到了人。")
         width, image_height = render_size(int(image.shape[2]), int(image.shape[1]))
-        camera = camera_info(angle["camera"], center, height, width, image_height)
+        camera = camera_info(angle["camera"], center, height, width, image_height, basis)
         coarse = render_coarse(splat, camera, width, image_height)[..., :3].float().cpu().clamp(0, 1)
         return {"ui": {"images": save_preview(coarse)}, "result": (coarse, ANYANGLE_PROMPT, camera)}
 

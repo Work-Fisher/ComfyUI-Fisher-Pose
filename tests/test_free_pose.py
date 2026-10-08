@@ -103,6 +103,13 @@ def two_people(xs=(-4.0, 5.0)):
 class TwoPeopleTests(unittest.TestCase):
     args = FreePoseTests.args
 
+    def test_group_reposes_existing_people_with_vnccs_trigger(self):
+        data = json.loads(two_people()); data['referenceMode'] = 'group'
+        prompt = free_pose_prompt('', json.dumps(data))
+        self.assertTrue(prompt.startswith('Draw character from image2.'))
+        self.assertIn('Repose the existing two people in image2 to match image1.', prompt)
+        self.assertIn('Keep their left-to-right order:', prompt)
+
     def test_second_person_is_image3_and_named_by_side(self):
         args = self.args(pose_json=two_people(), reference_image_2=torch.full((1, 64, 48, 3), .6))
         prompt = FisherQwenFreePose().encode(**args)['result'][3]
@@ -132,7 +139,7 @@ class TwoPeopleTests(unittest.TestCase):
                 self.assertAlmostEqual(float(images[1][:,:,center:,:].mean()), .8, delta=.02)
                 self.assertNotIn('image3', result[3])
                 source = 'right' if swapped else 'left'
-                self.assertIn(f'person on the {source} side of the original group photo in image2 in the pose and position of the left mannequin', result[3])
+                self.assertIn(f"person on the viewer's {source} in image2 takes the left mannequin pose", result[3])
 
     def test_group_binding_matches_labels_before_and_after_moving(self):
         # Source identities stay attached to person IDs when mannequins cross.
@@ -143,7 +150,10 @@ class TwoPeopleTests(unittest.TestCase):
                     data.update(referenceMode='group', swapPeople=swapped)
                     prompt = free_pose_prompt('', json.dumps(data))
                     for source, target in zip(sources, targets):
-                        self.assertIn(f'person on the {source} side of the original group photo in image2 in the pose and position of the {target} mannequin', prompt)
+                        image_label = ' in image2' if target == 'left' else ''
+                        self.assertIn(f"person on the viewer's {source}{image_label} takes the {target} mannequin pose", prompt)
+                    expected_order = 'Keep' if sources[0] == targets[0] else 'Exchange'
+                    self.assertIn(f'{expected_order} their left-to-right order:', prompt)
 
     def test_changing_only_pose_does_not_swap_source_identities(self):
         data = json.loads(two_people()); data['referenceMode'] = 'group'
@@ -151,7 +161,7 @@ class TwoPeopleTests(unittest.TestCase):
         data['people'][0]['pose'] = {'bones': {'upperarm_l': [0, 0, 45]}}
         second = free_pose_prompt('', json.dumps(data))
         self.assertEqual(first, second)
-        self.assertTrue(second.startswith('Draw the person on the left side'))
+        self.assertIn("person on the viewer's left in image2 takes the left mannequin pose", second)
 
     def test_legacy_two_photos_keep_separate_mode(self):
         data = json.loads(two_people()); data.pop('referenceMode')
