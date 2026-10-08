@@ -13,6 +13,7 @@ python tests/test_qwen_bridge.py <ComfyUI 目录>
 node tests/test_openpose_lift.mjs
 node --test tests/test_apply_state.mjs
 node --test tests/test_workflow_controls.mjs
+node --test tests/test_binding_runtime.mjs
 ```
 
 `test_free_pose.py` 和 `test_qwen_bridge.py` 需要传入 ComfyUI 目录，用来导入 `TextEncodeQwenImage21`。

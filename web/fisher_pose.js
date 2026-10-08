@@ -2,11 +2,12 @@ import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
 import { keepIfSame as keepIfUnchanged } from "./apply_state.mjs";
 import { scalarInput, cameraEnabled } from "./workflow_controls.mjs";
+import { verifyBindingRuntime } from "./binding_runtime.mjs";
 
 const EDITORS = {
     studio: { url: new URL("./editor/studio.html", import.meta.url), version: "20260922-preview2", title: "Fisher 机位与姿态编辑器",
               fields: ["scene_json", "output_mode", "width", "height", "extra_prompt"], data: "scene_json", image: "reference_image_1" },
-    freePose: { url: new URL("./editor/freepose.html", import.meta.url), version: "20261008-binding3", title: "Fisher 姿势与镜头",
+    freePose: { url: new URL("./editor/freepose.html", import.meta.url), version: "20261008-runtime1", title: "Fisher 姿势与镜头",
                 fields: ["pose_json", "extra_prompt"], data: "pose_json", image: "reference_image" },
 };
 const FREE_POSE_NODES = ["FisherQwenFreePose", "FisherPoseImage"];
@@ -330,10 +331,16 @@ app.registerExtension({
     name: "Fisher.PoseStudio",
     setup() {
         const graphToPrompt = app.graphToPrompt;
-        app.graphToPrompt = function (...args) {
+        app.graphToPrompt = async function (...args) {
             // Also cover programmatic widget changes and workflows loaded before this extension.
             syncCameraBranches();
-            return graphToPrompt.apply(this, args);
+            const result = await graphToPrompt.apply(this, args);
+            await verifyBindingRuntime(result.output, async () => {
+                const response = await api.fetchApi("/fisher_pose/env", { cache: "no-store" });
+                if (!response.ok) throw new Error("Backend unavailable");
+                return response.json();
+            }, location.origin);
+            return result;
         };
     },
     afterConfigureGraph() {

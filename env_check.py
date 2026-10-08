@@ -8,6 +8,9 @@ so the editor shows a banner and the node raises a clear message instead.
 import logging
 
 MIN_VERSION = "0.36.0"
+# Advertise a capability from the loaded process, not the Git checkout on disk.
+# Old running instances intentionally do not report this field after a file update.
+FREE_POSE_BINDING_VERSION = 1
 UPDATE_HINT = (f"ComfyUI 版本太旧，不支持 Qwen Image 2.1（需要 {MIN_VERSION} 或更新）。"
                "会出现「加载VAE 执行失败」「lora key not loaded」、出图和人物图一模一样等问题。"
                "请先更新 ComfyUI：便携版运行 update/update_comfyui.bat，git 安装执行 git pull。")
@@ -42,7 +45,8 @@ def splat_supported():
 
 def status():
     return {"version": comfy_version(), "minVersion": MIN_VERSION, "qwen21": qwen21_supported(),
-            "splat": splat_supported(), "updateHint": UPDATE_HINT}
+            "splat": splat_supported(), "updateHint": UPDATE_HINT,
+            "freePoseBindingVersion": FREE_POSE_BINDING_VERSION}
 
 
 def require_qwen21():

@@ -7,6 +7,7 @@ import { HAND_PRESETS } from '../vnccs/vnccs_hand_presets.mjs';
 import { readSkeletonImage } from './pose-import.mjs';
 import { liftOpenPose, WORLD_KEYPOINT_NAMES } from './openpose-lift.mjs';
 import { COMMON_POSES, directionKeypoints } from './common-poses.mjs';
+import { isGroupPose, bindingRuntimeProblem } from '../binding_runtime.mjs';
 
 const $ = selector => document.querySelector(selector);
 const embedded = new URLSearchParams(location.search).has('embedded');
@@ -1236,9 +1237,10 @@ async function checkEnvironment() {
     if (!studio.canGenerate) return;
     try {
         const env = await (await fetch('/fisher_pose/env', { cache: 'no-store' })).json();
-        if (env.qwen21) return;
-        $('#env-banner').textContent = `${env.updateHint}（当前版本 ${env.version}）`;
-        $('#env-banner').hidden = false;
+        const problem = !env.qwen21 ? `${env.updateHint}（当前版本 ${env.version}）`
+            : isGroupPose(doc, secondReferenceConnected) ? bindingRuntimeProblem(env, location.origin) : '';
+        $('#env-banner').textContent = problem;
+        $('#env-banner').hidden = !problem;
     } catch { /* standalone preview, or AIFISHER Canvas which does not proxy this route */ }
 }
 
