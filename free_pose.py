@@ -106,6 +106,8 @@ class FisherQwenFreePose:
     DESCRIPTION = "Qwen Image 2.1 自由姿势（1–2 人）。配合 VNCCS_QI2_PoseStudio LoRA：人偶图为 image1、人物图为 image2；两人默认使用完整合照（不裁切）：原图左人绑定人偶1、右人绑定人偶2，可交换对应。两张单人照模式才接 reference_image_2（image3）。人偶图尺寸在编辑器里设置；节点 width/height 只决定输出图尺寸，可接分辨率节点，两者无需一致。"
 
     def encode(self, clip, vae, reference_image, width, height, reference_resolution, extra_prompt, pose_json, reference_image_2=None):
+        if not (64 <= width <= 4096 and 64 <= height <= 4096):
+            raise ValueError("Qwen 输出宽高须在64到4096之间，请调整宽度、 高度整数常量。")
         if width % 16 or height % 16:
             raise ValueError("Qwen 输出宽高须为16的倍数，请调整节点的 width/height。")
         for image in (reference_image, reference_image_2):

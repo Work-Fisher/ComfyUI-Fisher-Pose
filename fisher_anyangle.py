@@ -132,20 +132,25 @@ class FisherShot:
         return {"required": {
             "pose_json": ("STRING", {"forceInput": True}),
             "shot_json": ("STRING", {"default": "{}", "multiline": True}),
+        }, "optional": {
+            "enable_camera": ("BOOLEAN", {"default": True,
+                "tooltip": "关闭：只生成正面人物姿势图；开启：按编辑器镜头执行完整流程。关闭不会清除保存的镜头。"}),
         }}
 
     RETURN_TYPES = ("STRING",)
     RETURN_NAMES = ("姿势与镜头",)
     FUNCTION = "merge"
     CATEGORY = "Fisher/姿态与机位"
-    DESCRIPTION = "保存编辑器里定好的镜头，与姿势合并后交给机位和最终图像节点。只改镜头时，正面图和 3D 重建直接复用。"
+    DESCRIPTION = "保存编辑器镜头。enable_camera 关闭时只输出正面人物姿势图，开启后恢复镜头流程；不清除镜头，也不改变正面生成参数。"
 
-    def merge(self, pose_json, shot_json):
+    def merge(self, pose_json, shot_json, enable_camera=True):
         data = json.loads(pose_json or "{}")
         shot = json.loads(shot_json or "{}")
         for key in SHOT_KEYS:
             if key in shot:
                 data[key] = shot[key]
+        if not enable_camera:
+            data["anyAngle"] = {**(data.get("anyAngle") or {}), "enabled": False}
         return (json.dumps(data, ensure_ascii=False),)
 
 
@@ -197,7 +202,7 @@ class FisherAnyAngleEncode:
         return {"required": {
             "clip": ("CLIP",), "vae": ("VAE",),
             "front_image": ("IMAGE",), "camera_image": ("IMAGE",),
-            # 0 = keep the front result's own size (rounded to 32), so the new angle matches the node's width/height.
+            # 0 = keep the front result's output size; reference encodings may still round to 32.
             "resolution": ("INT", {"default": 0, "min": 0, "max": 2048, "step": 32}),
         }}
 
@@ -208,7 +213,11 @@ class FisherAnyAngleEncode:
 
     def encode(self, clip, vae, front_image, camera_image, resolution):
         from comfy_extras.nodes_qwen import TextEncodeQwenImage21
-        return TextEncodeQwenImage21.execute(
+        positive, negative, latent = TextEncodeQwenImage21.execute(
             clip=clip, vae=vae, prompt=ANYANGLE_PROMPT, negative_prompt="",
             resolution=resolution, images={"image_1": front_image, "image_2": camera_image},
         ).result
+        if resolution == 0:
+            height, width = front_image.shape[1:3]
+            latent = {"samples": latent["samples"].new_zeros((1, 64, height // 16, width // 16))}
+        return positive, negative, latent

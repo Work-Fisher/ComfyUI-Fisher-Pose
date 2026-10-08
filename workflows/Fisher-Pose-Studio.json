@@ -1,8 +1,8 @@
 {
  "id": "1bad6502-d6d4-4314-ae63-4c30278933bf",
  "revision": 0,
- "last_node_id": 31,
- "last_link_id": 55,
+ "last_node_id": 34,
+ "last_link_id": 58,
  "nodes": [
   {
    "id": 1,
@@ -51,6 +51,7 @@
      ]
     }
    ],
+   "title": "Qwen Image 2.1 · 主模型",
    "properties": {
     "cnr_id": "comfy-core",
     "ver": "0.36.0",
@@ -64,7 +65,6 @@
     "unet_name": "qwen_image_2.1_int8_convrot.safetensors",
     "weight_dtype": "default"
    },
-   "title": "Qwen Image 2.1 · 主模型",
    "color": "#344254",
    "bgcolor": "#242d3b"
   },
@@ -82,7 +82,7 @@
    "flags": {
     "collapsed": false
    },
-   "order": 10,
+   "order": 12,
    "mode": 0,
    "inputs": [
     {
@@ -194,6 +194,7 @@
      ]
     }
    ],
+   "title": "Qwen3-VL · 文本编码器",
    "properties": {
     "cnr_id": "comfy-core",
     "ver": "0.36.0",
@@ -209,7 +210,6 @@
     "type": "qwen_image",
     "device": "default"
    },
-   "title": "Qwen3-VL · 文本编码器",
    "color": "#344254",
    "bgcolor": "#242d3b"
   },
@@ -253,6 +253,7 @@
      ]
     }
    ],
+   "title": "Qwen Image 2.1 · VAE",
    "properties": {
     "cnr_id": "comfy-core",
     "ver": "0.36.0",
@@ -264,7 +265,6 @@
    "widgets_values_named": {
     "vae_name": "qwen_image_2.1_vae_bf16.safetensors"
    },
-   "title": "Qwen Image 2.1 · VAE",
    "color": "#344254",
    "bgcolor": "#242d3b"
   },
@@ -351,7 +351,7 @@
    "flags": {
     "collapsed": false
    },
-   "order": 12,
+   "order": 14,
    "mode": 0,
    "inputs": [
     {
@@ -386,7 +386,7 @@
      "widget": {
       "name": "width"
      },
-     "link": null
+     "link": 57
     },
     {
      "localized_name": "height",
@@ -395,7 +395,7 @@
      "widget": {
       "name": "height"
      },
-     "link": null
+     "link": 58
     },
     {
      "localized_name": "reference_resolution",
@@ -510,7 +510,7 @@
    "flags": {
     "collapsed": false
    },
-   "order": 13,
+   "order": 15,
    "mode": 0,
    "inputs": [
     {
@@ -602,6 +602,7 @@
      ]
     }
    ],
+   "title": "正面采样 · 生成姿势",
    "properties": {
     "cnr_id": "comfy-core",
     "ver": "0.36.0",
@@ -625,7 +626,6 @@
     "scheduler": "simple",
     "denoise": 1
    },
-   "title": "正面采样 · 生成姿势",
    "color": "#786244",
    "bgcolor": "#3e3528"
   },
@@ -643,7 +643,7 @@
    "flags": {
     "collapsed": false
    },
-   "order": 15,
+   "order": 17,
    "mode": 0,
    "inputs": [
     {
@@ -674,12 +674,12 @@
      ]
     }
    ],
+   "title": "正面图像 · VAE 解码",
    "properties": {
     "cnr_id": "comfy-core",
     "ver": "0.36.0",
     "Node name for S&R": "VAEDecode"
    },
-   "title": "正面图像 · VAE 解码",
    "color": "#786244",
    "bgcolor": "#3e3528"
   },
@@ -720,6 +720,7 @@
      ]
     }
    ],
+   "title": "BiRefNet · 抠图模型",
    "properties": {
     "cnr_id": "comfy-core",
     "ver": "0.36.0",
@@ -731,7 +732,6 @@
    "widgets_values_named": {
     "bg_removal_name": "birefnet.safetensors"
    },
-   "title": "BiRefNet · 抠图模型",
    "color": "#344254",
    "bgcolor": "#242d3b"
   },
@@ -749,7 +749,7 @@
    "flags": {
     "collapsed": false
    },
-   "order": 16,
+   "order": 18,
    "mode": 2,
    "inputs": [
     {
@@ -775,12 +775,12 @@
      ]
     }
    ],
+   "title": "01 · 移除背景",
    "properties": {
     "cnr_id": "comfy-core",
     "ver": "0.36.0",
     "Node name for S&R": "RemoveBackground"
    },
-   "title": "01 · 移除背景",
    "color": "#4b566f",
    "bgcolor": "#2b3244"
   },
@@ -798,7 +798,7 @@
    "flags": {
     "collapsed": false
    },
-   "order": 17,
+   "order": 20,
    "mode": 2,
    "inputs": [
     {
@@ -842,6 +842,7 @@
      ]
     }
    ],
+   "title": "02 · 主体预处理",
    "properties": {
     "cnr_id": "comfy-core",
     "ver": "0.36.0",
@@ -855,7 +856,6 @@
     "erode_radius": 1,
     "size": 1024
    },
-   "title": "02 · 主体预处理",
    "color": "#4b566f",
    "bgcolor": "#2b3244"
   },
@@ -896,6 +896,7 @@
      ]
     }
    ],
+   "title": "DINOv3 · 视觉编码器",
    "properties": {
     "cnr_id": "comfy-core",
     "ver": "0.36.0",
@@ -907,7 +908,6 @@
    "widgets_values_named": {
     "clip_name": "dino_v3_vit_h.safetensors"
    },
-   "title": "DINOv3 · 视觉编码器",
    "color": "#344254",
    "bgcolor": "#242d3b"
   },
@@ -977,7 +977,7 @@
    "flags": {
     "collapsed": false
    },
-   "order": 18,
+   "order": 21,
    "mode": 2,
    "inputs": [
     {
@@ -1025,12 +1025,12 @@
      ]
     }
    ],
+   "title": "03 · 重建条件编码",
    "properties": {
     "cnr_id": "comfy-core",
     "ver": "0.36.0",
     "Node name for S&R": "TripoSplatConditioning"
    },
-   "title": "03 · 重建条件编码",
    "color": "#4b566f",
    "bgcolor": "#2b3244"
   },
@@ -1111,7 +1111,7 @@
    "flags": {
     "collapsed": false
    },
-   "order": 19,
+   "order": 22,
    "mode": 2,
    "inputs": [
     {
@@ -1296,7 +1296,7 @@
    "flags": {
     "collapsed": false
    },
-   "order": 20,
+   "order": 23,
    "mode": 2,
    "inputs": [
     {
@@ -1340,6 +1340,7 @@
      ]
     }
    ],
+   "title": "05 · 解码 3D 高斯",
    "properties": {
     "cnr_id": "comfy-core",
     "ver": "0.36.0",
@@ -1355,7 +1356,6 @@
     "seed": 0,
     "control_after_generate": "fixed"
    },
-   "title": "05 · 解码 3D 高斯",
    "color": "#4b566f",
    "bgcolor": "#2b3244"
   },
@@ -1373,7 +1373,7 @@
    "flags": {
     "collapsed": false
    },
-   "order": 21,
+   "order": 24,
    "mode": 2,
    "inputs": [
     {
@@ -1440,7 +1440,7 @@
    "flags": {
     "collapsed": false
    },
-   "order": 11,
+   "order": 13,
    "mode": 2,
    "inputs": [
     {
@@ -1509,7 +1509,7 @@
    "flags": {
     "collapsed": false
    },
-   "order": 22,
+   "order": 25,
    "mode": 2,
    "inputs": [
     {
@@ -1572,6 +1572,7 @@
      ]
     }
    ],
+   "title": "07 · AnyAngle 条件编码",
    "properties": {
     "aux_id": "Work-Fisher/ComfyUI-Fisher-Pose",
     "ver": "93f20bc7a77533da57bec685a0974f81c3f814b1",
@@ -1583,7 +1584,6 @@
    "widgets_values_named": {
     "resolution": 0
    },
-   "title": "07 · AnyAngle 条件编码",
    "color": "#655880",
    "bgcolor": "#372f49"
   },
@@ -1601,7 +1601,7 @@
    "flags": {
     "collapsed": false
    },
-   "order": 23,
+   "order": 26,
    "mode": 2,
    "inputs": [
     {
@@ -1734,7 +1734,7 @@
    "flags": {
     "collapsed": false
    },
-   "order": 24,
+   "order": 27,
    "mode": 2,
    "inputs": [
     {
@@ -1760,12 +1760,12 @@
      ]
     }
    ],
+   "title": "09 · 新机位 VAE 解码",
    "properties": {
     "cnr_id": "comfy-core",
     "ver": "0.36.0",
     "Node name for S&R": "VAEDecode"
    },
-   "title": "09 · 新机位 VAE 解码",
    "color": "#655880",
    "bgcolor": "#372f49"
   },
@@ -1783,7 +1783,7 @@
    "flags": {
     "collapsed": false
    },
-   "order": 26,
+   "order": 29,
    "mode": 0,
    "inputs": [
     {
@@ -1839,7 +1839,7 @@
    "flags": {
     "collapsed": false
    },
-   "order": 25,
+   "order": 28,
    "mode": 0,
    "inputs": [
     {
@@ -1891,12 +1891,12 @@
    ],
    "size": [
     400,
-    110
+    150
    ],
    "flags": {
     "collapsed": false
    },
-   "order": 14,
+   "order": 16,
    "mode": 0,
    "inputs": [
     {
@@ -1913,6 +1913,16 @@
       "name": "shot_json"
      },
      "link": null
+    },
+    {
+     "localized_name": "enable_camera",
+     "name": "enable_camera",
+     "shape": 7,
+     "type": "BOOLEAN",
+     "widget": {
+      "name": "enable_camera"
+     },
+     "link": 56
     }
    ],
    "outputs": [
@@ -1933,10 +1943,12 @@
     "Node name for S&R": "FisherShot"
    },
    "widgets_values": [
-    "{}"
+    "{}",
+    true
    ],
    "widgets_values_named": {
-    "shot_json": "{}"
+    "shot_json": "{}",
+    "enable_camera": true
    },
    "color": "#2f6664",
    "bgcolor": "#203b3c"
@@ -1955,7 +1967,7 @@
    "flags": {
     "collapsed": false
    },
-   "order": 9,
+   "order": 19,
    "mode": 0,
    "inputs": [
     {
@@ -1981,6 +1993,169 @@
    },
    "color": "#786244",
    "bgcolor": "#3e3528"
+  },
+  {
+   "id": 32,
+   "type": "PrimitiveBoolean",
+   "pos": [
+    560,
+    -65
+   ],
+   "size": [
+    410,
+    95
+   ],
+   "flags": {
+    "collapsed": false
+   },
+   "order": 9,
+   "mode": 0,
+   "inputs": [
+    {
+     "localized_name": "值",
+     "name": "value",
+     "type": "BOOLEAN",
+     "widget": {
+      "name": "value"
+     },
+     "link": null
+    }
+   ],
+   "outputs": [
+    {
+     "localized_name": "布尔",
+     "name": "BOOLEAN",
+     "type": "BOOLEAN",
+     "links": [
+      56
+     ]
+    }
+   ],
+   "title": "多角度开关 · 关=仅姿势 / 开=完整流程",
+   "properties": {
+    "cnr_id": "comfy-core",
+    "ver": "0.36.0",
+    "Node name for S&R": "PrimitiveBoolean",
+    "fisherControl": "enable_camera"
+   },
+   "widgets_values": [
+    false
+   ],
+   "widgets_values_named": {
+    "value": false
+   },
+   "color": "#455b80",
+   "bgcolor": "#28354b"
+  },
+  {
+   "id": 33,
+   "type": "PrimitiveInt",
+   "pos": [
+    1050,
+    -65
+   ],
+   "size": [
+    320,
+    95
+   ],
+   "flags": {
+    "collapsed": false
+   },
+   "order": 10,
+   "mode": 0,
+   "inputs": [
+    {
+     "localized_name": "数值",
+     "name": "value",
+     "type": "INT",
+     "widget": {
+      "name": "value"
+     },
+     "link": null
+    }
+   ],
+   "outputs": [
+    {
+     "localized_name": "整数",
+     "name": "INT",
+     "type": "INT",
+     "links": [
+      57
+     ]
+    }
+   ],
+   "title": "输出宽度 · 16 的倍数",
+   "properties": {
+    "cnr_id": "comfy-core",
+    "ver": "0.36.0",
+    "Node name for S&R": "PrimitiveInt",
+    "fisherControl": "width"
+   },
+   "widgets_values": [
+    1024,
+    "fixed"
+   ],
+   "widgets_values_named": {
+    "value": 1024,
+    "fixed": "fixed"
+   },
+   "color": "#455b80",
+   "bgcolor": "#28354b"
+  },
+  {
+   "id": 34,
+   "type": "PrimitiveInt",
+   "pos": [
+    1460,
+    -65
+   ],
+   "size": [
+    320,
+    95
+   ],
+   "flags": {
+    "collapsed": false
+   },
+   "order": 11,
+   "mode": 0,
+   "inputs": [
+    {
+     "localized_name": "数值",
+     "name": "value",
+     "type": "INT",
+     "widget": {
+      "name": "value"
+     },
+     "link": null
+    }
+   ],
+   "outputs": [
+    {
+     "localized_name": "整数",
+     "name": "INT",
+     "type": "INT",
+     "links": [
+      58
+     ]
+    }
+   ],
+   "title": "输出高度 · 16 的倍数",
+   "properties": {
+    "cnr_id": "comfy-core",
+    "ver": "0.36.0",
+    "Node name for S&R": "PrimitiveInt",
+    "fisherControl": "height"
+   },
+   "widgets_values": [
+    1024,
+    "fixed"
+   ],
+   "widgets_values_named": {
+    "value": 1024,
+    "fixed": "fixed"
+   },
+   "color": "#455b80",
+   "bgcolor": "#28354b"
   }
  ],
  "links": [
@@ -2327,6 +2502,30 @@
    31,
    0,
    "IMAGE"
+  ],
+  [
+   56,
+   32,
+   0,
+   30,
+   2,
+   "BOOLEAN"
+  ],
+  [
+   57,
+   33,
+   0,
+   6,
+   4,
+   "INT"
+  ],
+  [
+   58,
+   34,
+   0,
+   6,
+   5,
+   "INT"
   ]
  ],
  "groups": [
@@ -2340,7 +2539,6 @@
     1680
    ],
    "color": "#526781",
-   "font_size": 24,
    "flags": {}
   },
   {
@@ -2353,7 +2551,6 @@
     850
    ],
    "color": "#457b9c",
-   "font_size": 24,
    "flags": {}
   },
   {
@@ -2366,7 +2563,6 @@
     850
    ],
    "color": "#408782",
-   "font_size": 24,
    "flags": {}
   },
   {
@@ -2379,7 +2575,6 @@
     850
    ],
    "color": "#9b7c4f",
-   "font_size": 24,
    "flags": {}
   },
   {
@@ -2392,7 +2587,6 @@
     850
    ],
    "color": "#4e8e6d",
-   "font_size": 24,
    "flags": {}
   },
   {
@@ -2405,7 +2599,6 @@
     780
    ],
    "color": "#657596",
-   "font_size": 24,
    "flags": {}
   },
   {
@@ -2418,7 +2611,18 @@
     780
    ],
    "color": "#8572a8",
-   "font_size": 24,
+   "flags": {}
+  },
+  {
+   "id": 8,
+   "title": "00  生成控制 · 宽高只改变输出图，不改变人偶图尺寸",
+   "bounding": [
+    520,
+    -160,
+    1300,
+    210
+   ],
+   "color": "#577cac",
    "flags": {}
   }
  ],
@@ -2428,7 +2632,7 @@
    "scale": 0.58,
    "offset": [
     340,
-    135
+    340
    ]
   },
   "reroutes": [
@@ -2883,6 +3087,124 @@
     "linkIds": [
      50
     ]
+   },
+   {
+    "id": 43,
+    "pos": [
+     980,
+     -50
+    ],
+    "linkIds": [
+     56
+    ]
+   },
+   {
+    "id": 44,
+    "parentId": 43,
+    "pos": [
+     980,
+     906
+    ],
+    "linkIds": [
+     56
+    ]
+   },
+   {
+    "id": 45,
+    "parentId": 44,
+    "pos": [
+     990,
+     906
+    ],
+    "linkIds": [
+     56
+    ]
+   },
+   {
+    "id": 46,
+    "pos": [
+     1430,
+     -51
+    ],
+    "linkIds": [
+     57
+    ]
+   },
+   {
+    "id": 47,
+    "pos": [
+     1430,
+     124
+    ],
+    "linkIds": [
+     57
+    ],
+    "parentId": 46
+   },
+   {
+    "id": 48,
+    "pos": [
+     982,
+     124
+    ],
+    "linkIds": [
+     57
+    ],
+    "parentId": 47
+   },
+   {
+    "id": 49,
+    "pos": [
+     982,
+     346
+    ],
+    "linkIds": [
+     57
+    ],
+    "parentId": 48
+   },
+   {
+    "id": 50,
+    "pos": [
+     1810,
+     -51
+    ],
+    "linkIds": [
+     58
+    ]
+   },
+   {
+    "id": 51,
+    "pos": [
+     1810,
+     142
+    ],
+    "linkIds": [
+     58
+    ],
+    "parentId": 50
+   },
+   {
+    "id": 52,
+    "pos": [
+     994,
+     142
+    ],
+    "linkIds": [
+     58
+    ],
+    "parentId": 51
+   },
+   {
+    "id": 53,
+    "pos": [
+     994,
+     370
+    ],
+    "linkIds": [
+     58
+    ],
+    "parentId": 52
    }
   ],
   "linkExtensions": [
@@ -2925,6 +3247,18 @@
    {
     "id": 54,
     "parentId": 40
+   },
+   {
+    "id": 56,
+    "parentId": 45
+   },
+   {
+    "id": 57,
+    "parentId": 49
+   },
+   {
+    "id": 58,
+    "parentId": 53
    }
   ]
  },

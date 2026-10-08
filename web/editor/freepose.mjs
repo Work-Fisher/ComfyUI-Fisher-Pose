@@ -890,7 +890,9 @@ function refreshAngle() {
     $('#angle-controls').hidden = !studio.camera;
     $('#mode-camera').disabled = !studio.camera;
     $('#generate-editor').hidden = !studio.canGenerate;
-    $('#shot-status').textContent = angle.enabled ? '按当前镜头生成' : '正面镜头';
+    $('#shot-status').textContent = studio.cameraEnabled === false
+        ? '仅生成正面姿势图 · 多角度已关闭'
+        : angle.enabled ? '按当前镜头生成' : '正面镜头';
     $('#final-size').textContent = `${studio.outputWidth || doc.width} × ${studio.outputHeight || doc.height}`;
     if (!studio.camera && angle.enabled) $('#camera-unavailable').textContent = '此工作流无法生成已保存的镜头。请打开完整工作流，或恢复正面镜头后应用。';
 }

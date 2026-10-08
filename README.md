@@ -75,8 +75,9 @@ https://github.com/user-attachments/assets/24dc201a-d9dc-4ac7-86a8-acc9d8f6dd7c
 
 先按 [安装指南](docs/installation.md) 准备环境，导入唯一的最新版工作流 [Fisher-Pose-Studio.json](workflows/Fisher-Pose-Studio.json)。
 
-- **正面出图**：只需要基础模型，自动跳过换机位分支。
-- **只改镜头**：复用上一次正面结果与 3D 重建。
+- **多角度开关关闭**：只生成正面人物姿势图，仅需基础模型。
+- **多角度开关开启**：按保存的镜头运行完整流程；只改镜头时复用上一次正面结果与 3D 重建。
+- **输出尺寸**：上方两个整数常量分别控制宽、高，与编辑器内的人偶图尺寸独立。
 - **再生成一张**：姿势与镜头不变，再点「应用并生成」会更新正面种子。
 
 <details>

@@ -120,6 +120,26 @@ class ResultSelectionTests(unittest.TestCase):
 
 
 class ShotTests(unittest.TestCase):
+    def test_disabled_camera_returns_front_without_erasing_saved_shot(self):
+        shot = pose_json([1, 0, 2], [-0.5, 0, -1])
+        node = anyangle.FisherShot()
+        disabled = node.merge('{"kind":"vnccs-free-pose"}', shot, enable_camera=False)[0]
+        self.assertEqual(anyangle.shot_of(disabled), {})
+        self.assertEqual(anyangle.FisherPoseResult().check_lazy_status(disabled), ['front_image'])
+        restored = node.merge('{"kind":"vnccs-free-pose"}', shot, enable_camera=True)[0]
+        self.assertEqual(anyangle.shot_of(restored), json.loads(shot)['anyAngle'])
+        self.assertEqual(anyangle.FisherPoseResult().check_lazy_status(restored), ['camera_image'])
+
+    def test_disabled_camera_handles_legacy_pose_and_empty_shot(self):
+        original = pose_json([0, 0, 2], [0, 0, -1])
+        disabled = anyangle.FisherShot().merge(original, '{}', enable_camera=False)[0]
+        self.assertEqual(anyangle.shot_of(disabled), {})
+        self.assertEqual(json.loads(disabled)['anyAngle']['camera'], json.loads(original)['anyAngle']['camera'])
+
+    def test_enabling_switch_keeps_front_shot_on_fast_path(self):
+        merged = anyangle.FisherShot().merge('{}', '{}', enable_camera=True)[0]
+        self.assertEqual(anyangle.FisherPoseResult().check_lazy_status(merged), ['front_image'])
+
     def test_shot_overrides_only_camera_fields(self):
         pose = json.dumps({"kind": "vnccs-free-pose", "width": 768, "anyAngle": {"enabled": False}})
         shot = json.dumps({"anyAngle": {"enabled": True, "yaw": 30}, "shotPreviewFile": {"filename": "shot.png"}, "width": 1})

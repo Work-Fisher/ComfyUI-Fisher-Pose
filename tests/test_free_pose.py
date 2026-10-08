@@ -41,6 +41,11 @@ def pose_json(size=(512, 768), color=(255, 255, 255)):
 
 
 class FreePoseTests(unittest.TestCase):
+    def test_connected_integer_dimensions_are_range_checked(self):
+        for width, height in [(0, 1024), (1024, -16), (4112, 1024), (1024, 8192)]:
+            with self.subTest(width=width, height=height), self.assertRaisesRegex(ValueError, '64到4096'):
+                FisherQwenFreePose().encode(**self.args(width=width, height=height))
+
     def args(self, **overrides):
         args = dict(clip=RecordingClip(), vae=DummyVae(), reference_image=torch.full((1, 64, 48, 3), .2),
                     width=512, height=768, reference_resolution=256, extra_prompt='', pose_json=pose_json())
@@ -179,6 +184,13 @@ class OpenPoseLibraryTests(unittest.TestCase):
 
 
 class AnyAngleEncodeTests(unittest.TestCase):
+    def test_output_size_keeps_sixteen_pixel_dimensions_after_angle_change(self):
+        from fisher_test.fisher_anyangle import FisherAnyAngleEncode
+        front = torch.full((1, 112, 80, 3), .2)
+        coarse = torch.full((1, 112, 80, 3), .8)
+        _, _, latent = FisherAnyAngleEncode().encode(RecordingClip(), DummyVae(), front, coarse, 0)
+        self.assertEqual(tuple(latent['samples'].shape), (1, 64, 7, 5))
+
     def test_fixed_inputs_encode_both_references_with_vae(self):
         from fisher_test.fisher_anyangle import FisherAnyAngleEncode, ANYANGLE_PROMPT
         clip = RecordingClip()

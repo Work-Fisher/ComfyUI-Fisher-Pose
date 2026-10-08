@@ -1,17 +1,27 @@
 import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
 import { keepIfSame as keepIfUnchanged } from "./apply_state.mjs";
+import { scalarInput, cameraEnabled } from "./workflow_controls.mjs";
 
 const EDITORS = {
     studio: { url: new URL("./editor/studio.html", import.meta.url), version: "20260922-preview2", title: "Fisher 机位与姿态编辑器",
               fields: ["scene_json", "output_mode", "width", "height", "extra_prompt"], data: "scene_json", image: "reference_image_1" },
-    freePose: { url: new URL("./editor/freepose.html", import.meta.url), version: "20261007-review1", title: "Fisher 姿势与镜头",
+    freePose: { url: new URL("./editor/freepose.html", import.meta.url), version: "20261008-controls1", title: "Fisher 姿势与镜头",
                 fields: ["pose_json", "extra_prompt"], data: "pose_json", image: "reference_image" },
 };
 const FREE_POSE_NODES = ["FisherQwenFreePose", "FisherPoseImage"];
 const editorFor = node => FREE_POSE_NODES.includes(node.comfyClass || node.type) ? EDITORS.freePose : EDITORS.studio;
-const widget = (node, name) => node.widgets.find(item => item.name === name);
+const widget = (node, name) => node?.widgets?.find(item => item.name === name);
 let activeEditor = null;
+
+function styleWorkflowControl(node) {
+    const role = node.properties?.fisherControl;
+    if (!role) return;
+    const control = widget(node, "value");
+    if (!control) return;
+    if (role === "enable_camera") control.options = { ...control.options, on: "开启 · 全流程", off: "关闭 · 仅姿势" };
+    if (role === "width" || role === "height") control.options = { ...control.options, min: 64, max: 4096, step: 160 };
+}
 
 // Prefer the actual upstream image preview, falling back to LoadImage's file name.
 function upstreamPreview(node,inputName){
@@ -83,8 +93,9 @@ async function showPoseImage(node, shotData = null) {
     const slot = node.outputs?.findIndex(output => output.type === "IMAGE") ?? -1;
     const previews = (node.outputs?.[slot]?.links || []).map(id => graph.getNodeById(graph.links[id]?.target_id))
         .filter(target => target?.type === "PreviewImage");
-    let shot = data.shotPreviewFile;
-    if (!shot && data.shotPreview) shot = await uploadPng(data.shotPreview, "fisher_shot", "temp");
+    const useShot = cameraEnabled(shotNodeFor(node)) && data.anyAngle?.enabled && data.anyAngle?.camera;
+    let shot = useShot ? data.shotPreviewFile : null;
+    if (useShot && !shot && data.shotPreview) shot = await uploadPng(data.shotPreview, "fisher_shot", "temp");
     app.nodeOutputs[node.id] = { ...(app.nodeOutputs[node.id] || {}), images: shot ? [shot] : images };
     for (const target of previews) app.nodeOutputs[target.id] = { ...(app.nodeOutputs[target.id] || {}), images };
     app.graph.setDirtyCanvas(true, true);
@@ -135,6 +146,7 @@ function setCameraBranch(node, on) {
     const result = resultNodeFor(node);
     if (!result) return;
     const graph = graphOf(node);
+    on = on && cameraEnabled(shotNodeFor(node));
     const keep = new Set([result.id, ...upstream(graph, result, "front_image"), ...upstream(graph, result, "pose_json")]);
     const branch = new Set([...upstream(graph, result, "camera_image")].filter(id => !keep.has(id)));
     // Previews and other leaves that only read from the branch go with it.
@@ -147,6 +159,18 @@ function setCameraBranch(node, on) {
         }
     }
     for (const id of branch) { const n = graph.getNodeById(id); if (n) n.mode = on ? 0 : 2; }
+}
+
+function syncCameraBranches(graph = app.graph, preview = false) {
+    for (const node of graph?._nodes || []) {
+        if (node.type !== "FisherQwenFreePose") continue;
+        const shot = shotNodeFor(node);
+        const shotData = shot ? parseJson(widget(shot, "shot_json")?.value) : null;
+        const data = { ...parseJson(widget(node, "pose_json")?.value), ...shotData };
+        setCameraBranch(node, Boolean(data.anyAngle?.enabled && data.anyAngle?.camera));
+        if (preview) void showPoseImage(node, shotData).catch(() => {});
+    }
+    graph?.setDirtyCanvas(true, true);
 }
 
 // The front pass's samplers (fed by the pose node's conditioning).
@@ -222,8 +246,9 @@ function openEditor(node) {
                     camera: targets.some(n => n?.type === "FisherAnyAngleCamera") && targets.some(n => n?.type === "FisherPoseResult"),
                     canGenerate: node.type === "FisherQwenFreePose",
                     canOpenWorkflow: true,
-                    outputWidth: widget(node, "width")?.value,
-                    outputHeight: widget(node, "height")?.value,
+                    cameraEnabled: cameraEnabled(shotNode),
+                    outputWidth: scalarInput(node, "width", 1024),
+                    outputHeight: scalarInput(node, "height", 1024),
                 };
             }
             payload.referencePreview=upstreamPreview(node,editor.image);
@@ -303,7 +328,41 @@ function openEditor(node) {
 
 app.registerExtension({
     name: "Fisher.PoseStudio",
+    setup() {
+        const graphToPrompt = app.graphToPrompt;
+        app.graphToPrompt = function (...args) {
+            // Also cover programmatic widget changes and workflows loaded before this extension.
+            syncCameraBranches();
+            return graphToPrompt.apply(this, args);
+        };
+    },
+    afterConfigureGraph() {
+        for (const node of app.graph._nodes) styleWorkflowControl(node);
+        syncCameraBranches();
+    },
     async beforeRegisterNodeDef(nodeType, nodeData) {
+        if (["PrimitiveBoolean", "FisherShot"].includes(nodeData.name)) {
+            const created = nodeType.prototype.onNodeCreated;
+            nodeType.prototype.onNodeCreated = function () {
+                const result = created?.apply(this, arguments);
+                const control = widget(this, nodeData.name === "FisherShot" ? "enable_camera" : "value");
+                if (control) {
+                    const callback = control.callback;
+                    control.callback = (...args) => {
+                        const result = callback?.apply(control, args);
+                        syncCameraBranches(this.graph, true);
+                        return result;
+                    };
+                }
+                return result;
+            };
+            const connectionsChanged = nodeType.prototype.onConnectionsChange;
+            nodeType.prototype.onConnectionsChange = function () {
+                const result = connectionsChanged?.apply(this, arguments);
+                setTimeout(() => syncCameraBranches(this.graph, true), 0);
+                return result;
+            };
+        }
         if (!["FisherPoseStudio", "FisherQwenPose", ...FREE_POSE_NODES].includes(nodeData.name)) return;
         const freePose = FREE_POSE_NODES.includes(nodeData.name);
         const original = nodeType.prototype.onNodeCreated;
@@ -322,7 +381,7 @@ app.registerExtension({
         const configure = nodeType.prototype.onConfigure;
         nodeType.prototype.onConfigure = function () {
             const result = configure?.apply(this, arguments);
-            setTimeout(() => void showPoseImage(this).catch(() => {}), 600);
+            setTimeout(() => syncCameraBranches(this.graph, true), 600);
             return result;
         };
     },
