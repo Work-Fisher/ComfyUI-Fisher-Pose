@@ -131,14 +131,27 @@ class TwoPeopleTests(unittest.TestCase):
                 self.assertAlmostEqual(float(images[1][:,:,:center,:].mean()), .2, delta=.02)
                 self.assertAlmostEqual(float(images[1][:,:,center:,:].mean()), .8, delta=.02)
                 self.assertNotIn('image3', result[3])
-                source = 'left' if swapped else 'right'
+                source = 'right' if swapped else 'left'
                 self.assertIn(f'person on the {source} side of the original group photo in image2 in the pose and position of the left mannequin', result[3])
 
-    def test_group_binding_follows_ids_after_moving(self):
-        data = json.loads(two_people((6,-3))); data['referenceMode'] = 'group'
-        prompt = free_pose_prompt('', json.dumps(data))
-        self.assertIn('person on the right side of the original group photo in image2 in the pose and position of the right mannequin', prompt)
-        self.assertIn('person on the left side of the original group photo in image2 in the pose and position of the left mannequin', prompt)
+    def test_group_binding_matches_labels_before_and_after_moving(self):
+        # Source identities stay attached to person IDs when mannequins cross.
+        for xs, targets in [((-4, 5), ('left', 'right')), ((6, -3), ('right', 'left'))]:
+            for swapped, sources in [(False, ('left', 'right')), (True, ('right', 'left'))]:
+                with self.subTest(xs=xs, swapped=swapped):
+                    data = json.loads(two_people(xs))
+                    data.update(referenceMode='group', swapPeople=swapped)
+                    prompt = free_pose_prompt('', json.dumps(data))
+                    for source, target in zip(sources, targets):
+                        self.assertIn(f'person on the {source} side of the original group photo in image2 in the pose and position of the {target} mannequin', prompt)
+
+    def test_changing_only_pose_does_not_swap_source_identities(self):
+        data = json.loads(two_people()); data['referenceMode'] = 'group'
+        first = free_pose_prompt('', json.dumps(data))
+        data['people'][0]['pose'] = {'bones': {'upperarm_l': [0, 0, 45]}}
+        second = free_pose_prompt('', json.dumps(data))
+        self.assertEqual(first, second)
+        self.assertTrue(second.startswith('Draw the person on the left side'))
 
     def test_legacy_two_photos_keep_separate_mode(self):
         data = json.loads(two_people()); data.pop('referenceMode')

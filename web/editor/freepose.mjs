@@ -75,8 +75,8 @@ function instructionText() {
     const xs = doc.people.map((person, index) => (index === doc.active ? doc.transform : person.transform).x);
     const [first, second] = xs[0] <= xs[1] ? ['left', 'right'] : ['right', 'left'];
     if (doc.referenceMode === 'group') {
-        // Match the backend's empirically calibrated whole-photo binding.
-        const [sourceFirst, sourceSecond] = doc.swapPeople ? ['left', 'right'] : ['right', 'left'];
+        // Keep the prompt consistent with the visible source-photo identity labels.
+        const [sourceFirst, sourceSecond] = doc.swapPeople ? ['right', 'left'] : ['left', 'right'];
         return `Draw the person on the ${sourceFirst} side of the original group photo in image2 in the pose and position of the ${first} mannequin in image1, and the person on the ${sourceSecond} side of the original group photo in image2 in the pose and position of the ${second} mannequin in image1. Generate exactly two people, one per mannequin. Preserve each reference person's face, hairstyle, glasses and clothing. Replace their original poses completely. Do not duplicate anyone.`;
     }
     return `Draw the ${first} character from image2 in the pose of the ${first} mannequin in image1, and the ${second} character from image3 in the pose of the ${second} mannequin in image1.`;

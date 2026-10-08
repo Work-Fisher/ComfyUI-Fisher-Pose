@@ -39,9 +39,9 @@ def instruction(pose_json=None, reference_mode=None):
     data = json.loads(pose_json or '{}')
     mode = reference_mode or data.get('referenceMode', 'group')
     if mode == 'group':
-        # Whole-photo VNCCS binding compensation, observed with the user's paired runs.
-        # UI swapPeople describes the desired identity binding; the model prompt is inverted.
-        source_first, source_second = ('left', 'right') if data.get('swapPeople') else ('right', 'left')
+        # Match the identity binding shown in the editor. A model result that ignores
+        # this instruction must not invert the meaning for every subsequent pose.
+        source_first, source_second = ('right', 'left') if data.get('swapPeople') else ('left', 'right')
         return (f"Draw the person on the {source_first} side of the original group photo in image2 in the pose and position of the {first} mannequin in image1, "
                 f"and the person on the {source_second} side of the original group photo in image2 in the pose and position of the {second} mannequin in image1. "
                 "Generate exactly two people, one per mannequin. Preserve each reference person's face, hairstyle, glasses and clothing. "
