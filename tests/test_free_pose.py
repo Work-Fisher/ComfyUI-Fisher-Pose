@@ -56,8 +56,8 @@ class FreePoseTests(unittest.TestCase):
         args = self.args()
         positive, negative, latent, prompt, mannequin, passed = FisherQwenFreePose().encode(**args)['result']
         self.assertEqual(prompt, SINGLE_PERSON_INSTRUCTION)
-        self.assertIn('exactly one person', prompt)
-        self.assertIn('facial identity', prompt)
+        self.assertIn('Repose the person in image2 to match image1.', prompt)
+        self.assertIn('Preserve their appearance', prompt)
         calls = args['clip'].calls
         self.assertEqual(calls[0][0], prompt)
         self.assertEqual(calls[1][0], '')
@@ -80,6 +80,25 @@ class FreePoseTests(unittest.TestCase):
 
     def test_extra_prompt_follows_instruction(self):
         self.assertEqual(free_pose_prompt('  red dress \n\n studio light '), SINGLE_PERSON_INSTRUCTION + '\nred dress\nstudio light')
+
+    def test_single_after_two_portraits_uses_only_current_pose_and_photo(self):
+        node = FisherQwenFreePose()
+        args = self.args(pose_json=two_people(), reference_image_2=torch.full((1, 64, 48, 3), .6))
+        self.assertEqual(len(node.encode(**args)['result'][0][0][1]['reference_latents']), 3)
+        # Removing person 2 leaves referenceMode in saved editor state. The bypassed
+        # LoadImage is absent from the API request, and must not survive this switch.
+        for color in ((64, 64, 64), (192, 192, 192)):
+            data = json.loads(pose_json(color=color))
+            data.update(people=None, referenceMode='separate', swapPeople=True)
+            single = self.args(pose_json=json.dumps(data))
+            result = node.encode(**single)['result']
+            images = single['clip'].calls[0][1]['images']
+            self.assertEqual(len(images), 2)
+            self.assertEqual(len(result[0][0][1]['reference_latents']), 2)
+            self.assertAlmostEqual(float(images[0].mean()), color[0] / 255, places=3)
+            self.assertAlmostEqual(float(images[1].mean()), .2, delta=1 / 255)
+            self.assertEqual(result[3], SINGLE_PERSON_INSTRUCTION)
+            self.assertNotIn('image3', result[3])
 
     def test_invalid_inputs_do_not_encode(self):
         cases = [

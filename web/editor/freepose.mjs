@@ -8,10 +8,11 @@ import { readSkeletonImage } from './pose-import.mjs';
 import { liftOpenPose, WORLD_KEYPOINT_NAMES } from './openpose-lift.mjs';
 import { COMMON_POSES, directionKeypoints } from './common-poses.mjs';
 import { isGroupPose, bindingRuntimeProblem } from '../binding_runtime.mjs';
+import { reconcilePortraits } from '../portrait_inputs.mjs';
 
 const $ = selector => document.querySelector(selector);
 const embedded = new URLSearchParams(location.search).has('embedded');
-const INSTRUCTION = 'Draw character from image2\nGenerate exactly one person. Use image1 only for the body pose and body orientation. Render the person from image2 in that pose, replacing the original pose completely. Preserve the same facial identity, hairstyle, glasses, clothing, garment lengths, footwear and overall appearance from image2. Do not add another person or keep a second copy of the original pose.';
+const INSTRUCTION = 'Draw character from image2. Repose the person in image2 to match image1. Preserve their appearance and the scene.';
 const FRONT = { yaw: 0, pitch: 0 };
 const CAPTURE_BACKGROUND = [255, 255, 255];
 const CAPTURE_LIGHTS = [{ type: 'ambient', color: '#ffffff', intensity: 1.0 }];
@@ -812,6 +813,8 @@ function switchPerson(index) {
 
 function addPerson() {
     if (doc.people) return;
+    // Explicitly adding a second mannequin with one active photo selects group-photo mode.
+    if (doc.portraitState?.activeSlots.length === 1) { doc.referenceMode = 'group'; delete doc.portraitState; }
     const first = snapshotActive();
     // Room for two: side by side at the current size, on a landscape frame.
     const shift = 4.4 * first.transform.zoom;
@@ -831,6 +834,7 @@ function addPerson() {
 
 function removePerson() {
     if (!doc.people) return;
+    if (doc.portraitState?.activeSlots.length === 2) { toast('在工作流里关闭对应照片，会自动切换到单人；重新开启可恢复姿势。'); return; }
     if (doc.active !== 0) switchPerson(0);
     doc.people = null;
     doc.active = 0;
@@ -1010,7 +1014,10 @@ function refreshPeople() {
         button.hidden = index >= (two ? MAX_PEOPLE : 1) || (!two && index > 0);
         button.classList.toggle('active', index === doc.active);
     }
-    $('#people [data-person="0"]').hidden = !two;
+    const singleSlot = doc.portraitState?.activeSlots?.[0];
+    $('#people [data-person="0"]').hidden = !two && !singleSlot;
+    $('#people [data-person="0"]').textContent = `人物 ${!two && singleSlot ? singleSlot : 1}`;
+    $('#remove-person').hidden = doc.portraitState?.activeSlots.length === 2;
     $('#add-person').hidden = two;
     refreshPosePhoto();
 }
@@ -1019,7 +1026,7 @@ for (const button of document.querySelectorAll('[data-person]')) {
     button.onclick = event => (event.target.closest('#remove-person') ? removePerson() : switchPerson(Number(button.dataset.person)));
 }
 $('#add-person').onclick = addPerson;
-$('#reference-mode').onchange = event => { doc.referenceMode = event.target.value; refreshPeople(); refreshControls(); };
+$('#reference-mode').onchange = event => { doc.referenceMode = event.target.value; if (doc.referenceMode === 'group') delete doc.portraitState; refreshPeople(); refreshControls(); };
 for (const button of document.querySelectorAll('[data-reference-mode]')) button.onclick = () => {
     $('#reference-mode').value = button.dataset.referenceMode;
     $('#reference-mode').dispatchEvent(new Event('change'));
@@ -1289,7 +1296,8 @@ document.addEventListener('keydown', event => {
     if (key === 'z' && !event.shiftKey) { event.preventDefault(); viewer.undo(); }
     else if ((key === 'z' && event.shiftKey) || key === 'y') { event.preventDefault(); viewer.redo(); }
 });
-new ResizeObserver(() => viewer.resize(stage.clientWidth, stage.clientHeight)).observe(stage);
+const stageObserver = new ResizeObserver(() => viewer.resize(stage.clientWidth, stage.clientHeight));
+stageObserver.observe(stage);
 
 // --- Node bridge ------------------------------------------------------------
 
@@ -1311,7 +1319,9 @@ async function serialize() {
         shotPreview = viewer.capture(args[0], args[1], args[2], CAPTURE_BACKGROUND, ...args.slice(3), doc.outputSkeleton);
         viewer.updateCaptureCamera(...shotArgs());
     }
-    return JSON.stringify({ version: 2, kind: 'vnccs-free-pose', ...doc, people, active: undefined, anyAngle, camera: FRONT, poseReference, shotPreview });
+    let data = { version: 2, kind: 'vnccs-free-pose', ...doc, people, active: undefined, anyAngle, camera: FRONT, poseReference, shotPreview };
+    if (doc.portraitState) data = reconcilePortraits(data, doc.portraitState.activeSlots).data;
+    return JSON.stringify(data);
 }
 
 function personFrom(saved) {
@@ -1331,7 +1341,7 @@ function docFrom(saved) {
     const people = Array.isArray(saved.people) && saved.people.length > 1 ? saved.people.slice(0, 2).map(personFrom) : null;
     const { grips, ...first } = people ? people[0] : personFrom(saved);
     return {
-        ...first, people, active: 0, referenceMode: saved.referenceMode || (secondReferenceConnected ? 'separate' : 'group'), swapPeople: saved.swapPeople === true, outputSkeleton: saved.outputSkeleton === true, autoFit: saved.autoFit !== false,
+        ...first, people, active: 0, portraitState: saved.portraitState, referenceMode: saved.referenceMode || (secondReferenceConnected ? 'separate' : 'group'), swapPeople: saved.swapPeople === true, outputSkeleton: saved.outputSkeleton === true, autoFit: saved.autoFit !== false,
         // The mannequin size lives only here; the node's width/height are the separate output size.
         width: round16(Number(saved.width) || doc.width), height: round16(Number(saved.height) || doc.height),
         anyAngle: saved.anyAngle?.enabled ? normalizeShot({ ...saved.anyAngle, camera: undefined }, saved.autoFit !== false) : { ...NO_NEW_ANGLE },
@@ -1381,10 +1391,12 @@ async function start(payload) {
     void loadLibrary();
     void loadSavedList();
     await viewer.waitForCaptureReady();
+    if (payload?.inputsChanged) frameEveryone(true);
     $('#loading').hidden = true;
     $('#apply-editor').disabled = false;
     $('#save-status').textContent = restored ? '已恢复姿势与镜头' : '先选姿势，再定镜头';
     schedulePreview();
+    if (payload?.autoApply) await applyEditor(false);
 }
 
 window.addEventListener('message', event => {
@@ -1404,6 +1416,7 @@ async function applyEditor(generate = false) {
     } catch (error) { applicationError(error.message); }
 }
 function applicationError(message) {
+    if (embedded) parent.postMessage({ type: 'fisher-editor-error', message }, location.origin);
     $('#apply-editor').disabled = $('#generate-editor').disabled = false;
     $('#save-status').textContent = message;
     toast(message);
@@ -1415,13 +1428,23 @@ window.addEventListener('message', event => {
 });
 
 function showError(error) {
+    if (embedded) parent.postMessage({ type: 'fisher-editor-error', message: error?.message || String(error) }, location.origin);
     console.error(error);
     $('#loading-text').textContent = '加载失败：' + (error?.message || error);
     $('#loading').hidden = false;
 }
 
 if (!embedded) { $('#apply-editor').hidden = true; $('#cancel-editor').hidden = true; }
-window.freePose = { viewer, get doc() { return doc; }, serialize, prompt: promptText, fitFrame, importEntry, addFiles, saveCurrentPose, loadSavedPose, deleteSavedPose, applyCommonPose, galleries, detectPersonPose, addPerson, removePerson, switchPerson, frameEveryone, setAngle, setEditMode, setAutoFit };
+function dispose() {
+    ready = false;
+    clearTimeout(autoFitTimer); clearTimeout(previewTimer); clearTimeout(morphTimer);
+    previewRevision++;
+    stageObserver.disconnect();
+    viewer.renderer?.forceContextLoss();
+    viewer.dispose();
+    pack = null;
+}
+window.freePose = { viewer, get doc() { return doc; }, serialize, prompt: promptText, fitFrame, importEntry, addFiles, saveCurrentPose, loadSavedPose, deleteSavedPose, applyCommonPose, galleries, detectPersonPose, addPerson, removePerson, switchPerson, frameEveryone, setAngle, setEditMode, setAutoFit, dispose };
 
 (async () => {
     await viewer.init();

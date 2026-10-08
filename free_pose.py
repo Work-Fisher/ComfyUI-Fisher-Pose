@@ -2,7 +2,7 @@
 
 The VNCCS_QI2_PoseStudio LoRA was trained with the mannequin render as image1,
 the character photo as image2 and the fixed instruction below, so this node
-keeps that order and trigger, followed by explicit single-person identity/pose constraints.
+keeps that order and trigger, followed by an explicit request to repose the person.
 """
 import json
 
@@ -13,7 +13,8 @@ from .env_check import require_qwen21
 from .pose_reference import reference_image
 
 VNCCS_INSTRUCTION = "Draw character from image2"
-SINGLE_PERSON_INSTRUCTION = VNCCS_INSTRUCTION + "\n" + 'Generate exactly one person. Use image1 only for the body pose and body orientation. Render the person from image2 in that pose, replacing the original pose completely. Preserve the same facial identity, hairstyle, glasses, clothing, garment lengths, footwear and overall appearance from image2. Do not add another person or keep a second copy of the original pose.'
+SINGLE_PERSON_INSTRUCTION = (f"{VNCCS_INSTRUCTION}. Repose the person in image2 to match image1. "
+                             "Preserve their appearance and the scene.")
 
 
 def people_sides(pose_json):

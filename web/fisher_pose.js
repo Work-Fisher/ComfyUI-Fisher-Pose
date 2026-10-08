@@ -3,17 +3,19 @@ import { api } from "../../scripts/api.js";
 import { keepIfSame as keepIfUnchanged } from "./apply_state.mjs";
 import { scalarInput, cameraEnabled } from "./workflow_controls.mjs";
 import { verifyBindingRuntime } from "./binding_runtime.mjs";
+import { photoSlots, reconcilePortraits, routePortraitInputs } from "./portrait_inputs.mjs";
 
 const EDITORS = {
     studio: { url: new URL("./editor/studio.html", import.meta.url), version: "20260922-preview2", title: "Fisher 机位与姿态编辑器",
               fields: ["scene_json", "output_mode", "width", "height", "extra_prompt"], data: "scene_json", image: "reference_image_1" },
-    freePose: { url: new URL("./editor/freepose.html", import.meta.url), version: "20261008-repose2", title: "Fisher 姿势与镜头",
+    freePose: { url: new URL("./editor/freepose.html", import.meta.url), version: "20261008-portrait-inputs", title: "Fisher 姿势与镜头",
                 fields: ["pose_json", "extra_prompt"], data: "pose_json", image: "reference_image" },
 };
 const FREE_POSE_NODES = ["FisherQwenFreePose", "FisherPoseImage"];
 const editorFor = node => FREE_POSE_NODES.includes(node.comfyClass || node.type) ? EDITORS.freePose : EDITORS.studio;
 const widget = (node, name) => node?.widgets?.find(item => item.name === name);
 let activeEditor = null;
+let serializeGraph;
 
 function styleWorkflowControl(node) {
     const role = node.properties?.fisherControl;
@@ -180,8 +182,15 @@ function frontSamplers(node) {
     return graph._nodes.filter(n => /KSampler/.test(n.type) && (n.inputs || []).some(i => i.name === "positive" && i.link != null && graph.links[i.link]?.origin_id === node.id));
 }
 
-function openEditor(node) {
+async function openEditor(node, { autoApply = false, inputSlots = null } = {}) {
+    if (node.type === 'FisherQwenFreePose' && !inputSlots) {
+        const raw = await serializeGraph.call(app);
+        inputSlots = photoSlots(raw.output[node.id]?.inputs || {});
+        if (!inputSlots.length) throw new Error('请至少启用一张人物照片，再打开编辑器。');
+    }
     activeEditor?.();
+    let resolveEditor, rejectEditor, applyTimeout, applied = false;
+    const completed = new Promise((resolve, reject) => { resolveEditor = resolve; rejectEditor = reject; });
     const editor = editorFor(node);
     const overlay = document.createElement("dialog");
     overlay.style.cssText = "width:96vw;max-width:1700px;height:94vh;max-height:1100px;padding:0;border:1px solid #dce3ed;border-radius:12px;background:#f4f6f8;box-shadow:0 20px 90px #0007;overflow:hidden;";
@@ -219,15 +228,20 @@ function openEditor(node) {
     overlay.append(frame, referencePicker);
     const oldFocus = document.activeElement;
     function close() {
+        clearTimeout(applyTimeout);
         window.removeEventListener("message", receive);
+        frame.contentWindow?.freePose?.dispose?.();
         overlay.close();
         overlay.remove();
         oldFocus?.focus();
         activeEditor = null;
+        if (autoApply && !applied) rejectEditor(new Error('人物输入切换未完成，本次未排队。'));
+        else resolveEditor();
     }
     let applying = false;
     async function receive(event) {
         if (event.origin !== location.origin || event.source !== frame.contentWindow) return;
+        if (event.data?.type === 'fisher-editor-error' && autoApply) { rejectEditor(new Error(event.data.message)); close(); return; }
         if (event.data?.type === "fisher-ready") {
             const payload = Object.fromEntries(
                 editor.fields.map(name => [name, widget(node, name).value])
@@ -243,6 +257,13 @@ function openEditor(node) {
                 const targets = shotConsumers(node);
                 const shotNode = shotNodeFor(node);
                 if (shotNode) payload.pose_json = JSON.stringify({ ...parseJson(payload.pose_json), ...parseJson(widget(shotNode, "shot_json")?.value) });
+                if (inputSlots) {
+                    const reconciled = reconcilePortraits(parseJson(payload.pose_json), inputSlots);
+                    payload.pose_json = JSON.stringify(reconciled.data);
+                    payload.referenceSlots = inputSlots;
+                    payload.inputsChanged = reconciled.needsCapture;
+                }
+                payload.autoApply = autoApply;
                 payload.studio = {
                     camera: targets.some(n => n?.type === "FisherAnyAngleCamera") && targets.some(n => n?.type === "FisherPoseResult"),
                     canGenerate: node.type === "FisherQwenFreePose",
@@ -255,6 +276,12 @@ function openEditor(node) {
             payload.referencePreview=upstreamPreview(node,editor.image);
             payload.referencePreview2=editor===EDITORS.freePose?upstreamPreview(node,"reference_image_2"):null;
             payload.referenceImage2Connected = Boolean(node.inputs?.find(input => input.name === "reference_image_2")?.link != null);
+            if (inputSlots) {
+                const previews = [payload.referencePreview, payload.referencePreview2];
+                payload.referencePreview = previews[inputSlots[0] - 1];
+                payload.referencePreview2 = inputSlots.length === 2 ? previews[1] : null;
+                payload.referenceImage2Connected = inputSlots.length === 2;
+            }
             frame.contentWindow.postMessage({ type: "fisher-load", payload }, location.origin);
         }
         if (event.data?.type === "fisher-close") close();
@@ -314,9 +341,11 @@ function openEditor(node) {
                     const queued = await app.queuePrompt(0, 1);
                     if (queued === false) throw new Error("未能加入队列，请检查工作流的图片、模型和节点连接。姿势已保存。");
                 }
+                applied = true;
                 close();
             } catch (error) {
                 frame.contentWindow.postMessage({ type: "fisher-error", message: error.message }, location.origin);
+                if (autoApply) { rejectEditor(error); close(); }
             } finally { applying = false; }
         }
     }
@@ -325,16 +354,36 @@ function openEditor(node) {
     document.body.append(overlay);
     overlay.showModal();
     activeEditor = close;
+    if (autoApply) applyTimeout = setTimeout(() => {
+        const status = frame.contentDocument?.querySelector('#loading-text')?.textContent || '';
+        rejectEditor(new Error(`人物切换超时，请打开编辑器检查人偶后重试。${status}`)); close();
+    }, 60000);
+    return completed;
 }
 
 app.registerExtension({
     name: "Fisher.PoseStudio",
     setup() {
         const graphToPrompt = app.graphToPrompt;
+        serializeGraph = graphToPrompt;
         app.graphToPrompt = async function (...args) {
             // Also cover programmatic widget changes and workflows loaded before this extension.
             syncCameraBranches();
-            const result = await graphToPrompt.apply(this, args);
+            let result = await graphToPrompt.apply(this, args);
+            for (const node of app.graph._nodes) {
+                if (node.type !== 'FisherQwenFreePose' || !result.output[node.id]) continue;
+                const slots = photoSlots(result.output[node.id].inputs);
+                const { data, needsCapture } = reconcilePortraits(parseJson(widget(node, 'pose_json').value), slots);
+                if (needsCapture) {
+                    await openEditor(node, { autoApply: true, inputSlots: slots });
+                } else if (data.portraitState) {
+                    const item = widget(node, 'pose_json'), value = JSON.stringify(data);
+                    if (item.value !== value) { item.value = value; item.callback?.(value); graphOf(node).change(); }
+                }
+            }
+            // Capture both API inputs and saved workflow metadata after reconciliation.
+            result = await graphToPrompt.apply(this, args);
+            for (const value of Object.values(result.output)) if (value.class_type === 'FisherQwenFreePose') routePortraitInputs(value.inputs);
             await verifyBindingRuntime(result.output, async () => {
                 const response = await api.fetchApi("/fisher_pose/env", { cache: "no-store" });
                 if (!response.ok) throw new Error("Backend unavailable");
@@ -379,7 +428,7 @@ app.registerExtension({
             scene.type = "fisher_hidden";
             scene.computeSize = () => [0, -4];
             if (scene.element) scene.element.style.display = "none";
-            this.addWidget("button", freePose ? "编辑姿势与镜头" : "打开机位与姿态编辑器", null, () => openEditor(this), { serialize: false });
+            this.addWidget("button", freePose ? "编辑姿势与镜头" : "打开机位与姿态编辑器", null, () => { void openEditor(this).catch(error => app.extensionManager.toast.add({ severity: 'error', summary: 'Fisher Pose', detail: error.message, life: 6000 })); }, { serialize: false });
             this.size = freePose ? [380, 300] : nodeData.name === "FisherQwenPose" ? [420, 470] : [350, 290];
             return result;
         };
