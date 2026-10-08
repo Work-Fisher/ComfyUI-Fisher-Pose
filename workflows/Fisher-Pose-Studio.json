@@ -8,15 +8,15 @@
    "id": 1,
    "type": "UNETLoader",
    "pos": [
-    50,
-    780
+    60,
+    210
    ],
    "size": [
-    330,
-    82
+    360,
+    100
    ],
    "flags": {
-    "collapsed": true
+    "collapsed": false
    },
    "order": 0,
    "mode": 0,
@@ -63,21 +63,24 @@
    "widgets_values_named": {
     "unet_name": "qwen_image_2.1_int8_convrot.safetensors",
     "weight_dtype": "default"
-   }
+   },
+   "title": "Qwen Image 2.1 · 主模型",
+   "color": "#344254",
+   "bgcolor": "#242d3b"
   },
   {
    "id": 2,
    "type": "LoraLoaderModelOnly",
    "pos": [
-    390,
-    780
+    60,
+    370
    ],
    "size": [
-    330,
-    82
+    360,
+    100
    ],
    "flags": {
-    "collapsed": true
+    "collapsed": false
    },
    "order": 10,
    "mode": 0,
@@ -117,7 +120,7 @@
      ]
     }
    ],
-   "title": "VNCCS PoseStudio QI2.1 LoRA（必需）",
+   "title": "VNCCS · 姿势 LoRA",
    "properties": {
     "cnr_id": "comfy-core",
     "ver": "0.36.0",
@@ -130,21 +133,23 @@
    "widgets_values_named": {
     "lora_name": "VNCCS_QI2_PoseStudioV1.1.safetensors",
     "strength_model": 1
-   }
+   },
+   "color": "#344254",
+   "bgcolor": "#242d3b"
   },
   {
    "id": 3,
    "type": "CLIPLoader",
    "pos": [
-    730,
-    780
+    60,
+    530
    ],
    "size": [
-    330,
-    106
+    360,
+    130
    ],
    "flags": {
-    "collapsed": true
+    "collapsed": false
    },
    "order": 1,
    "mode": 0,
@@ -203,21 +208,24 @@
     "clip_name": "qwen3vl_8b_bf16.safetensors",
     "type": "qwen_image",
     "device": "default"
-   }
+   },
+   "title": "Qwen3-VL · 文本编码器",
+   "color": "#344254",
+   "bgcolor": "#242d3b"
   },
   {
    "id": 4,
    "type": "VAELoader",
    "pos": [
-    1070,
-    780
+    60,
+    720
    ],
    "size": [
-    330,
-    58
+    360,
+    80
    ],
    "flags": {
-    "collapsed": true
+    "collapsed": false
    },
    "order": 2,
    "mode": 0,
@@ -255,20 +263,25 @@
    ],
    "widgets_values_named": {
     "vae_name": "qwen_image_2.1_vae_bf16.safetensors"
-   }
+   },
+   "title": "Qwen Image 2.1 · VAE",
+   "color": "#344254",
+   "bgcolor": "#242d3b"
   },
   {
    "id": 5,
    "type": "LoadImage",
    "pos": [
-    50,
-    100
+    560,
+    210
    ],
    "size": [
-    320,
-    360
+    340,
+    600
    ],
-   "flags": {},
+   "flags": {
+    "collapsed": false
+   },
    "order": 3,
    "mode": 0,
    "inputs": [
@@ -307,7 +320,7 @@
      "links": null
     }
    ],
-   "title": "1 选择人物照片",
+   "title": "人物照片 · 单人 / 合照",
    "properties": {
     "cnr_id": "comfy-core",
     "ver": "0.36.0",
@@ -320,20 +333,24 @@
    "widgets_values_named": {
     "image": "example.png",
     "upload": "image"
-   }
+   },
+   "color": "#325c79",
+   "bgcolor": "#233744"
   },
   {
    "id": 6,
    "type": "FisherQwenFreePose",
    "pos": [
-    440,
-    100
+    1000,
+    210
    ],
    "size": [
-    420,
-    400
+    400,
+    480
    ],
-   "flags": {},
+   "flags": {
+    "collapsed": false
+   },
    "order": 12,
    "mode": 0,
    "inputs": [
@@ -454,7 +471,7 @@
      ]
     }
    ],
-   "title": "2 编辑姿势与镜头",
+   "title": "编辑姿势与镜头",
    "properties": {
     "aux_id": "Work-Fisher/ComfyUI-Fisher-Pose",
     "ver": "f9505b2385bccb168304c1c4d9987ef9e3df37bb",
@@ -475,21 +492,23 @@
     "extra_prompt": "",
     "pose_json": "{}",
     "编辑姿势与镜头": null
-   }
+   },
+   "color": "#2f6664",
+   "bgcolor": "#203b3c"
   },
   {
    "id": 7,
    "type": "KSampler",
    "pos": [
-    50,
-    890
+    1520,
+    210
    ],
    "size": [
-    320,
-    262
+    360,
+    310
    ],
    "flags": {
-    "collapsed": true
+    "collapsed": false
    },
    "order": 13,
    "mode": 0,
@@ -605,21 +624,24 @@
     "sampler_name": "euler",
     "scheduler": "simple",
     "denoise": 1
-   }
+   },
+   "title": "正面采样 · 生成姿势",
+   "color": "#786244",
+   "bgcolor": "#3e3528"
   },
   {
    "id": 8,
    "type": "VAEDecode",
    "pos": [
-    390,
-    890
+    1520,
+    590
    ],
    "size": [
-    210,
-    46
+    360,
+    80
    ],
    "flags": {
-    "collapsed": true
+    "collapsed": false
    },
    "order": 15,
    "mode": 0,
@@ -656,21 +678,24 @@
     "cnr_id": "comfy-core",
     "ver": "0.36.0",
     "Node name for S&R": "VAEDecode"
-   }
+   },
+   "title": "正面图像 · VAE 解码",
+   "color": "#786244",
+   "bgcolor": "#3e3528"
   },
   {
    "id": 12,
    "type": "LoadBackgroundRemovalModel",
    "pos": [
-    730,
-    890
+    60,
+    880
    ],
    "size": [
-    270,
-    58
+    360,
+    80
    ],
    "flags": {
-    "collapsed": true
+    "collapsed": false
    },
    "order": 4,
    "mode": 2,
@@ -705,21 +730,24 @@
    ],
    "widgets_values_named": {
     "bg_removal_name": "birefnet.safetensors"
-   }
+   },
+   "title": "BiRefNet · 抠图模型",
+   "color": "#344254",
+   "bgcolor": "#242d3b"
   },
   {
    "id": 13,
    "type": "RemoveBackground",
    "pos": [
-    1070,
-    890
+    560,
+    1110
    ],
    "size": [
-    147.169921875,
-    46
+    340,
+    100
    ],
    "flags": {
-    "collapsed": true
+    "collapsed": false
    },
    "order": 16,
    "mode": 2,
@@ -751,21 +779,24 @@
     "cnr_id": "comfy-core",
     "ver": "0.36.0",
     "Node name for S&R": "RemoveBackground"
-   }
+   },
+   "title": "01 · 移除背景",
+   "color": "#4b566f",
+   "bgcolor": "#2b3244"
   },
   {
    "id": 14,
    "type": "TripoSplatPreprocessImage",
    "pos": [
-    50,
-    1000
+    560,
+    1300
    ],
    "size": [
-    270,
-    102
+    340,
+    150
    ],
    "flags": {
-    "collapsed": true
+    "collapsed": false
    },
    "order": 17,
    "mode": 2,
@@ -823,21 +854,24 @@
    "widgets_values_named": {
     "erode_radius": 1,
     "size": 1024
-   }
+   },
+   "title": "02 · 主体预处理",
+   "color": "#4b566f",
+   "bgcolor": "#2b3244"
   },
   {
    "id": 15,
    "type": "CLIPVisionLoader",
    "pos": [
-    390,
-    1000
+    60,
+    1020
    ],
    "size": [
-    270,
-    58
+    360,
+    80
    ],
    "flags": {
-    "collapsed": true
+    "collapsed": false
    },
    "order": 5,
    "mode": 2,
@@ -872,21 +906,24 @@
    ],
    "widgets_values_named": {
     "clip_name": "dino_v3_vit_h.safetensors"
-   }
+   },
+   "title": "DINOv3 · 视觉编码器",
+   "color": "#344254",
+   "bgcolor": "#242d3b"
   },
   {
    "id": 16,
    "type": "VAELoader",
    "pos": [
-    730,
-    1000
+    60,
+    1160
    ],
    "size": [
-    270,
-    58
+    360,
+    80
    ],
    "flags": {
-    "collapsed": true
+    "collapsed": false
    },
    "order": 6,
    "mode": 2,
@@ -911,7 +948,7 @@
      ]
     }
    ],
-   "title": "Flux2 VAE（TripoSplat 用）",
+   "title": "Flux2 · 重建 VAE",
    "properties": {
     "cnr_id": "comfy-core",
     "ver": "0.36.0",
@@ -922,21 +959,23 @@
    ],
    "widgets_values_named": {
     "vae_name": "flux2-vae.safetensors"
-   }
+   },
+   "color": "#344254",
+   "bgcolor": "#242d3b"
   },
   {
    "id": 17,
    "type": "TripoSplatConditioning",
    "pos": [
-    1070,
-    1000
+    560,
+    1560
    ],
    "size": [
-    167.2330078125,
-    66
+    340,
+    150
    ],
    "flags": {
-    "collapsed": true
+    "collapsed": false
    },
    "order": 18,
    "mode": 2,
@@ -990,21 +1029,24 @@
     "cnr_id": "comfy-core",
     "ver": "0.36.0",
     "Node name for S&R": "TripoSplatConditioning"
-   }
+   },
+   "title": "03 · 重建条件编码",
+   "color": "#4b566f",
+   "bgcolor": "#2b3244"
   },
   {
    "id": 18,
    "type": "UNETLoader",
    "pos": [
-    50,
-    1110
+    60,
+    1300
    ],
    "size": [
-    270,
-    82
+    360,
+    100
    ],
    "flags": {
-    "collapsed": true
+    "collapsed": false
    },
    "order": 7,
    "mode": 2,
@@ -1038,7 +1080,7 @@
      ]
     }
    ],
-   "title": "TripoSplat 模型",
+   "title": "TripoSplat · 重建模型",
    "properties": {
     "cnr_id": "comfy-core",
     "ver": "0.36.0",
@@ -1051,21 +1093,23 @@
    "widgets_values_named": {
     "unet_name": "triposplat_fp16.safetensors",
     "weight_dtype": "default"
-   }
+   },
+   "color": "#344254",
+   "bgcolor": "#242d3b"
   },
   {
    "id": 19,
    "type": "KSampler",
    "pos": [
-    390,
+    980,
     1110
    ],
    "size": [
-    270,
-    262
+    340,
+    310
    ],
    "flags": {
-    "collapsed": true
+    "collapsed": false
    },
    "order": 19,
    "mode": 2,
@@ -1159,7 +1203,7 @@
      ]
     }
    ],
-   "title": "KSampler（生成 3D）",
+   "title": "04 · TripoSplat 采样",
    "properties": {
     "cnr_id": "comfy-core",
     "ver": "0.36.0",
@@ -1182,21 +1226,23 @@
     "sampler_name": "dpmpp_2m",
     "scheduler": "simple",
     "denoise": 1
-   }
+   },
+   "color": "#4b566f",
+   "bgcolor": "#2b3244"
   },
   {
    "id": 20,
    "type": "VAELoader",
    "pos": [
-    730,
-    1110
+    60,
+    1460
    ],
    "size": [
-    270,
-    58
+    360,
+    80
    ],
    "flags": {
-    "collapsed": true
+    "collapsed": false
    },
    "order": 8,
    "mode": 2,
@@ -1221,7 +1267,7 @@
      ]
     }
    ],
-   "title": "TripoSplat 解码器",
+   "title": "TripoSplat · 解码 VAE",
    "properties": {
     "cnr_id": "comfy-core",
     "ver": "0.36.0",
@@ -1232,21 +1278,23 @@
    ],
    "widgets_values_named": {
     "vae_name": "triposplat_vae_decoder_fp16.safetensors"
-   }
+   },
+   "color": "#344254",
+   "bgcolor": "#242d3b"
   },
   {
    "id": 21,
    "type": "VAEDecodeTripoSplat",
    "pos": [
-    1070,
-    1110
+    980,
+    1560
    ],
    "size": [
-    270,
-    126
+    340,
+    150
    ],
    "flags": {
-    "collapsed": true
+    "collapsed": false
    },
    "order": 20,
    "mode": 2,
@@ -1306,21 +1354,24 @@
     "num_gaussians": 262144,
     "seed": 0,
     "control_after_generate": "fixed"
-   }
+   },
+   "title": "05 · 解码 3D 高斯",
+   "color": "#4b566f",
+   "bgcolor": "#2b3244"
   },
   {
    "id": 22,
    "type": "FisherAnyAngleCamera",
    "pos": [
-    50,
-    1220
+    1440,
+    1110
    ],
    "size": [
-    263.24375,
-    66
+    340,
+    310
    ],
    "flags": {
-    "collapsed": true
+    "collapsed": false
    },
    "order": 21,
    "mode": 2,
@@ -1366,26 +1417,28 @@
      "links": null
     }
    ],
-   "title": "Fisher AnyAngle 机位（出粗渲染）",
+   "title": "06 · 按新机位渲染参考",
    "properties": {
     "aux_id": "Work-Fisher/ComfyUI-Fisher-Pose",
     "ver": "f9505b2385bccb168304c1c4d9987ef9e3df37bb",
     "Node name for S&R": "FisherAnyAngleCamera"
-   }
+   },
+   "color": "#655880",
+   "bgcolor": "#372f49"
   },
   {
    "id": 24,
    "type": "LoraLoaderModelOnly",
    "pos": [
-    390,
-    1220
+    60,
+    1600
    ],
    "size": [
-    270,
-    82
+    360,
+    100
    ],
    "flags": {
-    "collapsed": true
+    "collapsed": false
    },
    "order": 11,
    "mode": 2,
@@ -1425,7 +1478,7 @@
      ]
     }
    ],
-   "title": "AnyAngle LoRA",
+   "title": "AnyAngle · 机位 LoRA",
    "properties": {
     "cnr_id": "comfy-core",
     "ver": "0.36.0",
@@ -1438,21 +1491,23 @@
    "widgets_values_named": {
     "lora_name": "QI2.1_AnyAngle.safetensors",
     "strength_model": 1
-   }
+   },
+   "color": "#344254",
+   "bgcolor": "#242d3b"
   },
   {
    "id": 25,
    "type": "FisherAnyAngleEncode",
    "pos": [
-    730,
-    1220
+    1440,
+    1560
    ],
    "size": [
-    400,
-    246
+    340,
+    150
    ],
    "flags": {
-    "collapsed": true
+    "collapsed": false
    },
    "order": 22,
    "mode": 2,
@@ -1527,21 +1582,24 @@
    ],
    "widgets_values_named": {
     "resolution": 0
-   }
+   },
+   "title": "07 · AnyAngle 条件编码",
+   "color": "#655880",
+   "bgcolor": "#372f49"
   },
   {
    "id": 26,
    "type": "KSampler",
    "pos": [
-    1070,
-    1220
+    1850,
+    1110
    ],
    "size": [
-    270,
-    262
+    310,
+    310
    ],
    "flags": {
-    "collapsed": true
+    "collapsed": false
    },
    "order": 23,
    "mode": 2,
@@ -1635,7 +1693,7 @@
      ]
     }
    ],
-   "title": "KSampler（换机位）",
+   "title": "08 · 新机位采样",
    "properties": {
     "cnr_id": "comfy-core",
     "ver": "0.36.0",
@@ -1658,21 +1716,23 @@
     "sampler_name": "euler",
     "scheduler": "simple",
     "denoise": 1
-   }
+   },
+   "color": "#655880",
+   "bgcolor": "#372f49"
   },
   {
    "id": 27,
    "type": "VAEDecode",
    "pos": [
-    50,
-    1330
+    2220,
+    1110
    ],
    "size": [
-    140,
-    46
+    300,
+    100
    ],
    "flags": {
-    "collapsed": true
+    "collapsed": false
    },
    "order": 24,
    "mode": 2,
@@ -1704,20 +1764,25 @@
     "cnr_id": "comfy-core",
     "ver": "0.36.0",
     "Node name for S&R": "VAEDecode"
-   }
+   },
+   "title": "09 · 新机位 VAE 解码",
+   "color": "#655880",
+   "bgcolor": "#372f49"
   },
   {
    "id": 28,
    "type": "SaveImage",
    "pos": [
-    940,
-    100
+    2000,
+    430
    ],
    "size": [
-    420,
+    520,
     440
    ],
-   "flags": {},
+   "flags": {
+    "collapsed": false
+   },
    "order": 26,
    "mode": 0,
    "inputs": [
@@ -1745,7 +1810,7 @@
      "links": null
     }
    ],
-   "title": "3 最终图像",
+   "title": "最终图像 · 预览与保存",
    "properties": {
     "cnr_id": "comfy-core",
     "ver": "0.36.0",
@@ -1756,21 +1821,23 @@
    ],
    "widgets_values_named": {
     "filename_prefix": "Fisher-Pose/%date:yyyyMMdd_hhmmss%"
-   }
+   },
+   "color": "#39654f",
+   "bgcolor": "#243b30"
   },
   {
    "id": 29,
    "type": "FisherPoseResult",
    "pos": [
-    390,
-    1330
+    2000,
+    210
    ],
    "size": [
-    260,
-    106
+    520,
+    120
    ],
    "flags": {
-    "collapsed": true
+    "collapsed": false
    },
    "order": 25,
    "mode": 0,
@@ -1806,25 +1873,29 @@
      ]
     }
    ],
-   "title": "自动选择最终结果",
+   "title": "按镜头选择最终结果",
    "properties": {
     "aux_id": "Work-Fisher/ComfyUI-Fisher-Pose",
     "ver": "93f20bc7a77533da57bec685a0974f81c3f814b1",
     "Node name for S&R": "FisherPoseResult"
-   }
+   },
+   "color": "#39654f",
+   "bgcolor": "#243b30"
   },
   {
    "id": 30,
    "type": "FisherShot",
    "pos": [
-    50,
-    1480
+    1000,
+    770
    ],
    "size": [
     400,
-    200
+    110
    ],
-   "flags": {},
+   "flags": {
+    "collapsed": false
+   },
    "order": 14,
    "mode": 0,
    "inputs": [
@@ -1855,7 +1926,7 @@
      ]
     }
    ],
-   "title": "Fisher 镜头（编辑器自动写入）",
+   "title": "镜头数据 · 编辑器自动保存",
    "properties": {
     "aux_id": "Work-Fisher/ComfyUI-Fisher-Pose",
     "ver": "93f20bc7a77533da57bec685a0974f81c3f814b1",
@@ -1866,20 +1937,24 @@
    ],
    "widgets_values_named": {
     "shot_json": "{}"
-   }
+   },
+   "color": "#2f6664",
+   "bgcolor": "#203b3c"
   },
   {
    "id": 31,
    "type": "PreviewImage",
    "pos": [
-    390,
-    1030
+    1520,
+    740
    ],
    "size": [
-    140,
-    26
+    360,
+    160
    ],
-   "flags": {},
+   "flags": {
+    "collapsed": false
+   },
    "order": 9,
    "mode": 0,
    "inputs": [
@@ -1898,12 +1973,14 @@
      "links": null
     }
    ],
-   "title": "正面结果",
+   "title": "正面结果预览",
    "properties": {
     "cnr_id": "comfy-core",
     "ver": "0.36.0",
     "Node name for S&R": "PreviewImage"
-   }
+   },
+   "color": "#786244",
+   "bgcolor": "#3e3528"
   }
  ],
  "links": [
@@ -2255,38 +2332,601 @@
  "groups": [
   {
    "id": 1,
-   "title": "选照片 → 编辑姿势与镜头 → 生成",
+   "title": "01  模型加载",
    "bounding": [
-    25,
-    35,
-    1360,
-    570
+    20,
+    100,
+    440,
+    1680
    ],
-   "color": "#315acd",
+   "color": "#526781",
+   "font_size": 24,
    "flags": {}
   },
   {
    "id": 2,
-   "title": "自动处理区 · 通常无需调整",
+   "title": "02  人物输入",
    "bounding": [
-    25,
-    690,
-    1360,
+    520,
+    100,
+    420,
+    850
+   ],
+   "color": "#457b9c",
+   "font_size": 24,
+   "flags": {}
+  },
+  {
+   "id": 3,
+   "title": "03  姿势与镜头",
+   "bounding": [
+    960,
+    100,
+    480,
+    850
+   ],
+   "color": "#408782",
+   "font_size": 24,
+   "flags": {}
+  },
+  {
+   "id": 4,
+   "title": "04  正面生成",
+   "bounding": [
+    1480,
+    100,
+    440,
+    850
+   ],
+   "color": "#9b7c4f",
+   "font_size": 24,
+   "flags": {}
+  },
+  {
+   "id": 5,
+   "title": "07  最终输出",
+   "bounding": [
+    1960,
+    100,
+    600,
+    850
+   ],
+   "color": "#4e8e6d",
+   "font_size": 24,
+   "flags": {}
+  },
+  {
+   "id": 6,
+   "title": "05  主体重建 · 换机位时自动执行",
+   "bounding": [
+    520,
+    1000,
+    840,
     780
    ],
-   "color": "#718198",
+   "color": "#657596",
+   "font_size": 24,
+   "flags": {}
+  },
+  {
+   "id": 7,
+   "title": "06  新机位生成 · 完成后送往最终输出",
+   "bounding": [
+    1400,
+    1000,
+    1160,
+    780
+   ],
+   "color": "#8572a8",
+   "font_size": 24,
    "flags": {}
   }
  ],
  "config": {},
  "extra": {
   "ds": {
-   "scale": 0.45,
+   "scale": 0.58,
    "offset": [
-    1228.888888888889,
-    -454.1111111111111
+    340,
+    135
    ]
-  }
+  },
+  "reroutes": [
+   {
+    "id": 1,
+    "pos": [
+     500,
+     728
+    ],
+    "linkIds": [
+     10
+    ]
+   },
+   {
+    "id": 2,
+    "parentId": 1,
+    "pos": [
+     500,
+     920
+    ],
+    "linkIds": [
+     10
+    ]
+   },
+   {
+    "id": 3,
+    "parentId": 2,
+    "pos": [
+     1490,
+     920
+    ],
+    "linkIds": [
+     10
+    ]
+   },
+   {
+    "id": 4,
+    "parentId": 3,
+    "pos": [
+     1490,
+     618
+    ],
+    "linkIds": [
+     10
+    ]
+   },
+   {
+    "id": 5,
+    "pos": [
+     1900,
+     598
+    ],
+    "linkIds": [
+     15
+    ]
+   },
+   {
+    "id": 6,
+    "parentId": 5,
+    "pos": [
+     1900,
+     960
+    ],
+    "linkIds": [
+     15
+    ]
+   },
+   {
+    "id": 7,
+    "parentId": 6,
+    "pos": [
+     540,
+     960
+    ],
+    "linkIds": [
+     15
+    ]
+   },
+   {
+    "id": 8,
+    "parentId": 7,
+    "pos": [
+     540,
+     1148
+    ],
+    "linkIds": [
+     15
+    ]
+   },
+   {
+    "id": 9,
+    "pos": [
+     1910,
+     598
+    ],
+    "linkIds": [
+     16
+    ]
+   },
+   {
+    "id": 10,
+    "parentId": 9,
+    "pos": [
+     1910,
+     974
+    ],
+    "linkIds": [
+     16
+    ]
+   },
+   {
+    "id": 11,
+    "parentId": 10,
+    "pos": [
+     530,
+     974
+    ],
+    "linkIds": [
+     16
+    ]
+   },
+   {
+    "id": 12,
+    "parentId": 11,
+    "pos": [
+     530,
+     1308
+    ],
+    "linkIds": [
+     16
+    ]
+   },
+   {
+    "id": 13,
+    "pos": [
+     440,
+     210
+    ],
+    "linkIds": [
+     31
+    ]
+   },
+   {
+    "id": 14,
+    "parentId": 13,
+    "pos": [
+     440,
+     330
+    ],
+    "linkIds": [
+     31
+    ]
+   },
+   {
+    "id": 15,
+    "parentId": 14,
+    "pos": [
+     40,
+     330
+    ],
+    "linkIds": [
+     31
+    ]
+   },
+   {
+    "id": 16,
+    "parentId": 15,
+    "pos": [
+     40,
+     1608
+    ],
+    "linkIds": [
+     31
+    ]
+   },
+   {
+    "id": 17,
+    "pos": [
+     460,
+     1608
+    ],
+    "linkIds": [
+     37
+    ]
+   },
+   {
+    "id": 18,
+    "parentId": 17,
+    "pos": [
+     460,
+     1740
+    ],
+    "linkIds": [
+     37
+    ]
+   },
+   {
+    "id": 19,
+    "parentId": 18,
+    "pos": [
+     1820,
+     1740
+    ],
+    "linkIds": [
+     37
+    ]
+   },
+   {
+    "id": 20,
+    "parentId": 19,
+    "pos": [
+     1820,
+     1118
+    ],
+    "linkIds": [
+     37
+    ]
+   },
+   {
+    "id": 21,
+    "pos": [
+     490,
+     728
+    ],
+    "linkIds": [
+     42
+    ]
+   },
+   {
+    "id": 22,
+    "parentId": 21,
+    "pos": [
+     490,
+     986
+    ],
+    "linkIds": [
+     42
+    ]
+   },
+   {
+    "id": 23,
+    "parentId": 22,
+    "pos": [
+     2190,
+     986
+    ],
+    "linkIds": [
+     42
+    ]
+   },
+   {
+    "id": 24,
+    "parentId": 23,
+    "pos": [
+     2190,
+     1138
+    ],
+    "linkIds": [
+     42
+    ]
+   },
+   {
+    "id": 25,
+    "pos": [
+     470,
+     538
+    ],
+    "linkIds": [
+     48
+    ]
+   },
+   {
+    "id": 26,
+    "parentId": 25,
+    "pos": [
+     470,
+     1470
+    ],
+    "linkIds": [
+     48
+    ]
+   },
+   {
+    "id": 27,
+    "parentId": 26,
+    "pos": [
+     1410,
+     1470
+    ],
+    "linkIds": [
+     48
+    ]
+   },
+   {
+    "id": 28,
+    "parentId": 27,
+    "pos": [
+     1410,
+     1568
+    ],
+    "linkIds": [
+     48
+    ]
+   },
+   {
+    "id": 29,
+    "pos": [
+     480,
+     728
+    ],
+    "linkIds": [
+     49
+    ]
+   },
+   {
+    "id": 30,
+    "parentId": 29,
+    "pos": [
+     480,
+     1484
+    ],
+    "linkIds": [
+     49
+    ]
+   },
+   {
+    "id": 31,
+    "parentId": 30,
+    "pos": [
+     1420,
+     1484
+    ],
+    "linkIds": [
+     49
+    ]
+   },
+   {
+    "id": 32,
+    "parentId": 31,
+    "pos": [
+     1420,
+     1588
+    ],
+    "linkIds": [
+     49
+    ]
+   },
+   {
+    "id": 33,
+    "pos": [
+     1930,
+     598
+    ],
+    "linkIds": [
+     50
+    ]
+   },
+   {
+    "id": 34,
+    "parentId": 33,
+    "pos": [
+     1930,
+     1040
+    ],
+    "linkIds": [
+     50
+    ]
+   },
+   {
+    "id": 35,
+    "parentId": 42,
+    "pos": [
+     1430,
+     1460
+    ],
+    "linkIds": [
+     50
+    ]
+   },
+   {
+    "id": 36,
+    "parentId": 35,
+    "pos": [
+     1430,
+     1608
+    ],
+    "linkIds": [
+     50
+    ]
+   },
+   {
+    "id": 37,
+    "pos": [
+     1420,
+     778
+    ],
+    "linkIds": [
+     54
+    ]
+   },
+   {
+    "id": 38,
+    "parentId": 37,
+    "pos": [
+     1420,
+     160
+    ],
+    "linkIds": [
+     54
+    ]
+   },
+   {
+    "id": 39,
+    "parentId": 38,
+    "pos": [
+     1970,
+     160
+    ],
+    "linkIds": [
+     54
+    ]
+   },
+   {
+    "id": 40,
+    "parentId": 39,
+    "pos": [
+     1970,
+     218
+    ],
+    "linkIds": [
+     54
+    ]
+   },
+   {
+    "id": 41,
+    "parentId": 34,
+    "pos": [
+     1810,
+     1040
+    ],
+    "linkIds": [
+     50
+    ]
+   },
+   {
+    "id": 42,
+    "parentId": 41,
+    "pos": [
+     1810,
+     1460
+    ],
+    "linkIds": [
+     50
+    ]
+   }
+  ],
+  "linkExtensions": [
+   {
+    "id": 10,
+    "parentId": 4
+   },
+   {
+    "id": 15,
+    "parentId": 8
+   },
+   {
+    "id": 16,
+    "parentId": 12
+   },
+   {
+    "id": 31,
+    "parentId": 16
+   },
+   {
+    "id": 37,
+    "parentId": 20
+   },
+   {
+    "id": 42,
+    "parentId": 24
+   },
+   {
+    "id": 48,
+    "parentId": 28
+   },
+   {
+    "id": 49,
+    "parentId": 32
+   },
+   {
+    "id": 50,
+    "parentId": 36
+   },
+   {
+    "id": 54,
+    "parentId": 40
+   }
+  ]
  },
  "version": 0.4
 }
