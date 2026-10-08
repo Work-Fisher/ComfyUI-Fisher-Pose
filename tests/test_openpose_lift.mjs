@@ -1,6 +1,6 @@
 // Run: node tests/test_openpose_lift.mjs
 import assert from 'node:assert/strict';
-import { liftOpenPose, isFacingAway } from '../web/editor/openpose-lift.mjs';
+import { liftOpenPose, isFacingAway, LIFT_SEGMENTS } from '../web/editor/openpose-lift.mjs';
 
 // Mannequin rest (world units, y up, subject's left at +x), T-pose-ish arms down.
 const rest = {
@@ -50,4 +50,23 @@ console.log('openpose-lift: all tests passed');
     assert.ok(normal.neck[2] > 1);
     assert.ok(flipped.neck[2] < -1, 'torso flip must change the forward/backward bend');
     assert.equal(flipped.neck[2], -normal.neck[2]);
+}
+
+{
+    // An illustration can have longer legs/narrower shoulders without bending in depth.
+    const drawing = structuredClone(front);
+    for (const key of ['ls', 'rs', 'lh', 'rh']) drawing[key][0] = 400 + (drawing[key][0] - 400) * 0.7;
+    for (const key of ['lk', 'rk', 'la', 'ra']) drawing[key][1] = 400 + (drawing[key][1] - 400) * 1.35;
+    const { head: unused, ...bodyRest } = rest; // The editor passes the head-bone position separately.
+    const { kps } = liftOpenPose(drawing, bodyRest, {}, 'planar');
+    for (const point of Object.values(kps)) assert.equal(point[2], 0, 'body proportions must not invent depth');
+    drawing.hipMid = drawing.lh.map((v, i) => (v + drawing.rh[i]) / 2);
+    for (const [, a, b] of LIFT_SEGMENTS) {
+        const actual = kps[b].map((v, i) => v - kps[a][i]);
+        const targetLength = Math.hypot(...rest[b].map((v, i) => v - rest[a][i]));
+        assert.ok(Math.abs(Math.hypot(...actual) - targetLength) < 1e-8, 'retargeting preserves mannequin bone lengths');
+        const dx = drawing[b][0] - drawing[a][0], dy = drawing[a][1] - drawing[b][1];
+        assert.ok(Math.abs(actual[0] * dy - actual[1] * dx) < 1e-8, 'retargeting preserves visible limb directions');
+    }
+    assert.ok(Object.values(liftOpenPose(drawing, rest).kps).some(p => Math.abs(p[2]) > 0.1), 'legacy depth estimation remains available');
 }

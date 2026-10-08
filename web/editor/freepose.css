@@ -125,3 +125,9 @@ button:focus-visible,summary:focus-visible{outline:2px solid #315acd;outline-off
 #download-detected-pose:hover{text-decoration:underline}
 #detected-pose-preview{display:block;width:100%;max-height:230px;object-fit:contain;background:#080b10;border-radius:7px}
 #detected-pose>small{display:block;font-size:10px;line-height:1.6;color:#68758b}
+.pose-overlay-toggle{display:flex;align-items:center;gap:7px;font-size:11px;color:#46556d;margin:8px 0}
+.pose-overlay-toggle input{accent-color:#315acd}
+.pose-depth-mode{margin-bottom:8px}
+.pose-depth-mode button{flex:1}
+.pose-depth-hint{display:block;font-size:10px;line-height:1.7;color:#68758b;margin-bottom:10px}
+#depth-flips[hidden]{display:none}

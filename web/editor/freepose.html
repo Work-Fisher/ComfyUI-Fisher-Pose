@@ -12,7 +12,7 @@
 <button id="use-person-photo" class="text-button" hidden>使用已接人物图</button>
 <div id="pose-photo-selection" hidden><img id="pose-photo-preview" alt="当前姿势参考图" style="width:100%;max-height:180px;object-fit:contain"><small id="pose-photo-name"></small></div>
 <button id="detect-person" class="wide fp-save" disabled>先选择姿势参考图</button>
-<div id="detected-pose" hidden><div class="section-heading"><h2>识别出的骨骼</h2><a id="download-detected-pose" download="pose-skeleton.png">下载骨架图</a></div><img id="detected-pose-preview" alt="DWPose 识别出的骨架图"><button id="apply-detected-pose" class="wide fp-save">应用到当前人偶</button><small>先检查关节位置，再应用。遮挡和前后深度仍可能需要手动调整。</small></div>
+<div id="detected-pose" hidden><div class="section-heading"><h2>识别出的骨骼</h2><a id="download-detected-pose" download="pose-skeleton.png">下载骨架图</a></div><label class="pose-overlay-toggle"><input id="pose-preview-overlay" type="checkbox" checked>叠加原图对照</label><img id="detected-pose-preview" alt="DWPose 关节点与原图对照"><button id="apply-detected-pose" class="wide fp-save">应用到当前人偶</button><small>默认贴合原图中的动作方向。遮挡关节可能识别不准，手指需单独调整。</small></div>
 <small id="pose-detector-hint">仅提取动作，不替换工作流中的人物照片。</small>
 </section>
 <div class="fp-pick"><label class="fp-button"><input type="file" id="pick-folder" webkitdirectory multiple>导入骨架文件夹</label><label class="fp-button"><input type="file" id="pick-files" accept="image/*" multiple>导入骨架图片</label></div>
@@ -23,7 +23,9 @@
 <button id="save-pose" class="wide fp-save">＋ 保存当前姿势</button>
 <div id="saved-poses" class="fp-gallery fp-saved"></div></section>
 <section id="depth-section" hidden><div class="section-heading"><h2>深度修正</h2><small>2D 骨架看不出前后</small></div>
-<div class="fp-flips"><button data-flip="body">正/背面</button><button data-flip="torso">上身前/后倾</button>
+<div class="segmented pose-depth-mode"><button data-depth-mode="planar">贴合原图</button><button data-depth-mode="estimate">估算立体</button></div>
+<small class="pose-depth-hint">贴合原图保留二维动作方向；估算立体根据骨长猜测前后，可再手动翻转。</small>
+<div class="fp-flips" id="depth-flips"><button data-flip="body">正/背面</button><button data-flip="torso">上身前/后倾</button>
 <span>左臂</span><button data-flip="lArmUpper">整条</button><button data-flip="lArmLower">小臂</button>
 <span>右臂</span><button data-flip="rArmUpper">整条</button><button data-flip="rArmLower">小臂</button>
 <span>左腿</span><button data-flip="lLegUpper">整条</button><button data-flip="lLegLower">小腿</button>
@@ -85,4 +87,4 @@
 <section class="description-section"><div class="section-heading"><h2>提示词</h2><button id="copy-description" class="text-button">复制</button></div><label class="field-label">补充要求（建议英文）<textarea id="extra-prompt" placeholder="例如：keep the outfit, soft studio light"></textarea></label><p id="description"></p><span class="description-note">补充要求会在生成时一并使用</span></section></details>
 </aside></main>
 <footer class="app-footer"><span>Fisher Pose <span class="footer-dot">/</span> Free Pose · mannequin core © MiuProject (MIT)</span><span>调整完成后点「应用并生成」</span></footer>
-<script type="module" src="freepose.mjs?v=20261008-portrait-inputs"></script></body></html>
+<script type="module" src="freepose.mjs?v=20261008-pose-keypoints"></script></body></html>

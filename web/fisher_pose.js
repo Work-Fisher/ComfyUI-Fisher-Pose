@@ -8,7 +8,7 @@ import { photoSlots, reconcilePortraits, routePortraitInputs } from "./portrait_
 const EDITORS = {
     studio: { url: new URL("./editor/studio.html", import.meta.url), version: "20260922-preview2", title: "Fisher 机位与姿态编辑器",
               fields: ["scene_json", "output_mode", "width", "height", "extra_prompt"], data: "scene_json", image: "reference_image_1" },
-    freePose: { url: new URL("./editor/freepose.html", import.meta.url), version: "20261008-portrait-inputs", title: "Fisher 姿势与镜头",
+    freePose: { url: new URL("./editor/freepose.html", import.meta.url), version: "20261008-pose-keypoints", title: "Fisher 姿势与镜头",
                 fields: ["pose_json", "extra_prompt"], data: "pose_json", image: "reference_image" },
 };
 const FREE_POSE_NODES = ["FisherQwenFreePose", "FisherPoseImage"];

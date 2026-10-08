@@ -1,8 +1,6 @@
-// Lift a single 2D OpenPose body (pixels, from pose-import.mjs readSkeletonImage)
-// into 3D keypoints for the VNCCS mannequin. A 2D skeleton has no depth, so each
-// segment's depth comes from foreshortening: |dz| = sqrt(L² - l²), where L is the
-// mannequin's bone length and l the projected length. The front/back sign is a
-// heuristic (knees, elbows, hands forward; shins back) that the user can flip.
+// Retarget 2D body coordinates to the mannequin. Photos default to planar
+// directions; optional depth estimation assumes foreshortening: |dz| = sqrt(L²-l²).
+// That assumption cannot distinguish body proportions from depth.
 
 // [key, from, to, default forward sign, flip group]
 export const LIFT_SEGMENTS = [
@@ -31,13 +29,34 @@ export function isFacingAway(points) {
  * @param points {head(nose), neck, ls, le, lw, rs, re, rw, lh, lk, la, rh, rk, ra}: [x, y] image pixels
  * @param rest same keys plus hipMid, as [x, y, z] mannequin rest positions (neck = shoulder midpoint)
  * @param flips {torso, body, lArmUpper, lArmLower, ...}: true = invert that depth guess
+ * @param depthMode 'planar' = preserve 2D directions; 'estimate' = infer depth (legacy imports)
  * @returns {kps, facingAway, scale} with kps relative to the hip midpoint, y up, +z toward the camera
  */
-export function liftOpenPose(points, rest, flips = {}) {
+export function liftOpenPose(points, rest, flips = {}, depthMode = 'estimate') {
     const p2 = Object.fromEntries(Object.entries(points).map(([key, [x, y]]) => [key, [x, -y]]));
     p2.hipMid = mid(p2.lh, p2.rh);
     const restLength = ([, a, b]) => length(sub(rest[b], rest[a]));
     const imageLength = ([, a, b]) => length(sub(p2[b], p2[a]));
+    if (depthMode === 'planar') {
+        // One image does not distinguish different body proportions from foreshortening.
+        // Preserve visible segment directions by default for photos; depth inference is opt-in.
+        const offset = (a, b, size) => {
+            const delta = sub(p2[b], p2[a]), n = length(delta);
+            if (n < 1e-6) return [0, -size, 0];
+            return [delta[0] / n * size, delta[1] / n * size, 0];
+        };
+        const scale = restLength(LIFT_SEGMENTS[0]) / Math.max(imageLength(LIFT_SEGMENTS[0]), 1e-6);
+        const kps = { hipMid: [0, 0, 0] };
+        kps.neck = offset('hipMid', 'neck', restLength(LIFT_SEGMENTS[0]));
+        for (const [a, b, center] of [['lh', 'rh', 'hipMid'], ['ls', 'rs', 'neck']]) {
+            const half = offset(b, a, length(sub(rest[a], rest[b])) / 2);
+            kps[a] = add(kps[center], half);
+            kps[b] = sub(kps[center], half);
+        }
+        kps.head = add(kps.neck, [...sub(p2.head, p2.neck).map(v => v * scale), 0]);
+        for (const seg of LIFT_SEGMENTS.slice(1)) kps[seg[2]] = add(kps[seg[1]], offset(seg[1], seg[2], restLength(seg)));
+        return { kps, facingAway: isFacingAway(points), scale };
+    }
     // The second-least foreshortened segment sets pixels→world, tolerating one odd proportion.
     const ratios = LIFT_SEGMENTS.filter(seg => imageLength(seg) > 1e-3).map(seg => restLength(seg) / imageLength(seg)).sort((a, b) => a - b);
     if (!ratios.length) throw Error('骨架关节重合，无法换算成人偶姿势');

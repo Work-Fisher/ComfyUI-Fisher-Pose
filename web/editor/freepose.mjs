@@ -5,6 +5,7 @@ import { PoseViewerCore } from '../vnccs/vnccs_pose_studio_core.mjs?v=20261005-s
 import { loadMorphPack, solveMorph, buildStaticModelData } from '../vnccs/vnccs_pose_morph_runtime.mjs';
 import { HAND_PRESETS } from '../vnccs/vnccs_hand_presets.mjs';
 import { readSkeletonImage } from './pose-import.mjs';
+import { readPoseKeypoints, largestBody, requireBody, poseOverlay } from './pose-keypoints.mjs';
 import { liftOpenPose, WORLD_KEYPOINT_NAMES } from './openpose-lift.mjs';
 import { COMMON_POSES, directionKeypoints } from './common-poses.mjs';
 import { isGroupPose, bindingRuntimeProblem } from '../binding_runtime.mjs';
@@ -332,7 +333,7 @@ const refit = snap => (doc.people ? updateCamera(snap) : fitFrame(snap));
 function applyOpenPose() {
     const { points, flips } = doc.openpose;
     const { facingAway } = importKeypoints((rest, head) => {
-        const lifted = liftOpenPose(points, rest, flips);
+        const lifted = liftOpenPose(points, rest, flips, doc.openpose.depthMode);
         // The spine IK target is the head bone origin, not the nose: keep the nose direction at head-bone distance.
         const headDistance = Math.hypot(...head.map((v, i) => v - rest.neck[i]));
         const direction = lifted.kps.head.map((v, i) => v - lifted.kps.neck[i]);
@@ -370,8 +371,8 @@ function poseFromSkeleton(image, key, label) {
 }
 
 // 从人物图识别姿势: DWPose (comfyui_controlnet_aux) runs on the person photo through ComfyUI's own
-// queue, then its skeleton poses the mannequin like any OpenPose image. Body only; hands and face are
-// left to the hand presets.
+// queue. Apply original POSE_KEYPOINT coordinates, never re-detect them from the rendered PNG.
+// Body only; hands and face are left to the hand presets.
 const DWPOSE_MODELS = { bbox_detector: 'yolox_l.torchscript.pt', pose_estimator: 'dw-ll_ucoco_384_bs5.torchscript.pt' };
 
 async function dwposeAvailable() {
@@ -416,6 +417,7 @@ async function detectPersonPose() {
             2: { class_type: 'DWPreprocessor', inputs: { image: ['1', 0], detect_hand: 'disable', detect_body: 'enable', detect_face: 'disable', resolution: 1024,
                 bbox_detector: pickOption(info.bbox_detector?.[0], DWPOSE_MODELS.bbox_detector), pose_estimator: pickOption(info.pose_estimator?.[0], DWPOSE_MODELS.pose_estimator) } },
             3: { class_type: 'PreviewImage', inputs: { images: ['2', 0] } },
+            4: { class_type: 'PreviewAny', inputs: { source: ['2', 1] } },
         };
         const queued = await (await fetch('/prompt', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt }) })).json();
         if (!queued.prompt_id) throw new Error(queued.error?.message || 'ComfyUI 没有接受识别任务');
@@ -432,11 +434,17 @@ async function detectPersonPose() {
         const image = new Image();
         image.src = '/view?' + new URLSearchParams({ filename: output.filename, subfolder: output.subfolder || '', type: output.type || 'temp' });
         await image.decode();
-        detectedPose = { image, name: source.name };
-        $('#detected-pose-preview').src = image.src;
+        // An output node keeps the JSON in history even when the detector was cached.
+        const keypoints = result.outputs?.['4']?.text?.[0];
+        if (!keypoints) throw new Error('没有得到原始关节点，请更新 ComfyUI 后重新识别');
+        const detection = readPoseKeypoints(keypoints);
+        const photo = new Image(); photo.src = source.url; await photo.decode();
+        detectedPose = { image, name: source.name, ...detection, overlay: poseOverlay(photo, detection) };
+        $('#pose-preview-overlay').checked = true;
+        $('#detected-pose-preview').src = detectedPose.overlay;
         $('#download-detected-pose').href = image.src;
         $('#detected-pose').hidden = false;
-        status.textContent = '骨骼图已生成，人偶尚未改变。检查结果后点击「应用到当前人偶」。';
+        status.textContent = '已将关节点叠在原图上，人偶尚未改变。确认肩、肘、腕、髋、膝和脚踝后再应用；手指不在本次识别范围内。';
     } catch (error) {
         status.textContent = `识别失败：${error.message.includes('未识别到') ? '图里没有检测到完整的人' : error.message}`;
     } finally { detectingPose = false; refreshPosePhoto(); }
@@ -461,8 +469,19 @@ async function importEntry(entry) {
 function refreshFlips(facingAway) {
     $('#depth-section').hidden = !doc.openpose;
     const flips = doc.openpose?.flips || {};
+    const planar = doc.openpose?.depthMode === 'planar';
+    for (const button of document.querySelectorAll('[data-depth-mode]')) button.classList.toggle('active', button.dataset.depthMode === (planar ? 'planar' : 'estimate'));
+    $('#depth-flips').hidden = planar;
     for (const button of document.querySelectorAll('[data-flip]')) button.classList.toggle('on', Boolean(flips[button.dataset.flip]));
     if (facingAway !== undefined) $('[data-flip=body]').textContent = facingAway ? '背面 → 改正面' : '正面 → 改背面';
+}
+
+for (const button of document.querySelectorAll('[data-depth-mode]')) {
+    button.onclick = () => {
+        if (!doc.openpose) return;
+        doc.openpose.depthMode = button.dataset.depthMode;
+        applyOpenPose();
+    };
 }
 
 for (const button of document.querySelectorAll('[data-flip]')) {
@@ -739,11 +758,17 @@ $('#choose-pose-photo').onclick = () => {
 $('#pose-photo-file').onchange = event => onPosePhotoFile(event.target.files[0]);
 $('#use-person-photo').onclick = () => selectPosePhoto(personPreviewUrls[doc.active ?? 0], `已接人物图 ${(doc.active ?? 0) + 1}`);
 $('#detect-person').onclick = detectPersonPose;
+$('#pose-preview-overlay').onchange = event => {
+    if (detectedPose) $('#detected-pose-preview').src = event.target.checked ? detectedPose.overlay : detectedPose.image.src;
+};
 $('#apply-detected-pose').onclick = () => {
     if (!detectedPose) return;
     try {
-        const result = poseFromSkeleton(detectedPose.image, 'photo', detectedPose.name);
-        $('#import-status').textContent = `已应用骨骼：${result}。前后不对可用深度修正，手势可单独调整。`;
+        const points = requireBody(largestBody(detectedPose.people));
+        doc.openpose = { key: 'photo', name: detectedPose.name, points, flips: {}, depthMode: 'planar' };
+        applyOpenPose();
+        const count = detectedPose.people.length > 1 ? `图中有 ${detectedPose.people.length} 人，已取最大的一个。` : '';
+        $('#import-status').textContent = `已按原图关节点贴合动作。${count}当前保留二维方向；需要前后深度可在下方切换「估算立体」。手势需单独调整。`;
     } catch (error) { $('#import-status').textContent = `应用失败：${error.message}`; }
 };
 
