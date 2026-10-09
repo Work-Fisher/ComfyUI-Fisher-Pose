@@ -131,3 +131,11 @@ button:focus-visible,summary:focus-visible{outline:2px solid #315acd;outline-off
 .pose-depth-mode button{flex:1}
 .pose-depth-hint{display:block;font-size:10px;line-height:1.7;color:#68758b;margin-bottom:10px}
 #depth-flips[hidden]{display:none}
+.fp-movement-tools{position:absolute;left:16px;top:58px;z-index:2;user-select:none}
+.fp-tool-buttons{display:flex;gap:3px;padding:4px;background:#252b3fe8;border:1px solid #ffffff26;border-radius:8px;box-shadow:0 4px 16px #0002}
+.fp-tool-buttons button{padding:7px 10px;border:0;background:transparent;color:#c3cde1;font-size:12px}
+.fp-tool-buttons button[aria-pressed=true]{background:#e4ebfb;color:#243c70}
+.fp-tool-buttons button:focus-visible{outline:2px solid #829dff;outline-offset:2px}
+#movement-legend{display:flex;gap:14px;padding:8px 6px;font-size:11px;font-weight:600;text-shadow:0 1px 3px #000}
+#movement-legend[hidden],#movement-tools[hidden]{display:none}
+.axis-x{color:#ff7676}.axis-y{color:#80df8b}.axis-z{color:#82aaff}

@@ -1851,6 +1851,7 @@ export class PoseViewerCore {
     }
 
     handlePointerDown(e) {
+        if (this.options.enablePoseInteraction === false) return;
         if (!this.initialized || !this.skinnedMesh) return;
         if (e.button !== 0) return;
         if (this._hoverPointerFrame) {
@@ -2079,6 +2080,7 @@ export class PoseViewerCore {
     }
 
     schedulePointerMove(e) {
+        if (this.options.enablePoseInteraction === false) return;
         // Direct manipulation needs every event for input fidelity. Passive hover
         // raycasts cannot produce more visible updates than the display refresh
         // rate, so only process the latest hover event in each frame.
@@ -2101,6 +2103,7 @@ export class PoseViewerCore {
     }
 
     handlePointerMove(e) {
+        if (this.options.enablePoseInteraction === false) return;
         if (!this.initialized || !this.skinnedMesh) return;
 
         if (this.directDrag?.active && !this.directDrag.hasDragged) {

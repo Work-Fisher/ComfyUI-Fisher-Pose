@@ -1,8 +1,9 @@
 import { loadBodyPack } from './body-pack.mjs?v=20261010-feedback2';
+import { createMovementGizmo } from './movement-gizmo.mjs?v=20261010-xyz1';
 // Free-pose editor: one VNCCS MakeHuman mannequin. Editing uses a free orbit view;
 // the output is always the VNCCS front capture (yaw 0 / pitch 0, white background,
 // flat white ambient light), which is what the VNCCS_QI2_PoseStudio LoRA was trained on.
-import { PoseViewerCore } from '../vnccs/vnccs_pose_studio_core.mjs?v=20261005-skeleton1';
+import { PoseViewerCore } from '../vnccs/vnccs_pose_studio_core.mjs?v=20261010-xyz1';
 import { solveMorph, buildStaticModelData } from '../vnccs/vnccs_pose_morph_runtime.mjs';
 import { HAND_PRESETS } from '../vnccs/vnccs_hand_presets.mjs';
 import { readSkeletonImage } from './pose-import.mjs';
@@ -44,6 +45,8 @@ const JOINT_BONES = { ls: 'upperarm_l', le: 'lowerarm_l', lw: 'hand_l', rs: 'upp
 const NO_NEW_ANGLE = { enabled: false, yaw: 0, pitch: 0, zoom: 1, offsetX: 0, offsetY: 0 };
 let studio = { camera: false, canGenerate: false, canOpenWorkflow: false };
 let editMode = 'pose';
+let poseTool = 'joints';
+let movementGizmo = null;
 let previewRevision = 0;
 let autoFitTimer = null;
 let fitting = false;
@@ -1003,7 +1006,34 @@ function setEditMode(mode) {
     viewer.orbit.enabled = mode === 'pose';
     updateCamera(true);
     viewer.orbit.enabled = mode === 'pose';
+    refreshMovementTool();
 }
+
+function refreshMovementTool() {
+    const moving = editMode === 'pose' && poseTool === 'move';
+    $('#movement-tools').hidden = editMode !== 'pose';
+    for (const button of document.querySelectorAll('[data-pose-tool]')) button.setAttribute('aria-pressed', String(button.dataset.poseTool === poseTool));
+    $('#movement-legend').hidden = !moving;
+    $('#movement-view').hidden = !moving;
+    if (editMode === 'pose') $('#selection-hint').textContent = moving
+        ? '拖彩色轴移动当前人物 · 拖空白处观察 · 侧面观察更容易拖动 Z 轴'
+        : '拖关节摆姿 · Shift+拖动移动人物';
+    if (editMode === 'pose') $('#mode-help').textContent = moving
+        ? '拖 XYZ 轴移动整个人物。斜看三轴只改变观察方向，不改变拍摄镜头。'
+        : '拖关节摆动作，拖空白处换方向观察。观察方向不改变已定好的镜头。';
+    movementGizmo?.sync(moving);
+}
+for (const button of document.querySelectorAll('[data-pose-tool]')) button.onclick = () => {
+    poseTool = button.dataset.poseTool;
+    refreshMovementTool();
+};
+$('#movement-view').onclick = () => {
+    // Change only the observation view; the saved shot remains untouched.
+    const distance = viewer.camera.position.distanceTo(viewer.orbit.target);
+    const direction = new viewer.THREE.Vector3(0.8, 0.45, 1).normalize();
+    viewer.camera.position.copy(viewer.orbit.target).addScaledVector(direction, distance);
+    viewer.orbit.update(); viewer.requestRender();
+};
 
 $('#camera-enabled').onchange = event => {
     studio.cameraEnabled = event.target.checked;
@@ -1143,7 +1173,7 @@ function setupInteraction() {
     viewer.orbit.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.PAN, RIGHT: THREE.MOUSE.PAN };
     // Shift+drag moves the person inside the front frame; it must pre-empt orbit and bone picking.
     canvas.addEventListener('pointerdown', event => {
-        if (event.button !== 0 || !event.shiftKey || !ready) return;
+        if (event.button !== 0 || !event.shiftKey || !ready || poseTool === 'move') return;
         event.stopImmediatePropagation();
         event.preventDefault();
         manualPlacement();
@@ -1218,6 +1248,7 @@ function refreshControls() {
     }
     $('#description').textContent = promptText();
     refreshBoneSliders();
+    refreshMovementTool();
 }
 
 // One undo entry per slider gesture: record before the first input event.
@@ -1453,6 +1484,18 @@ async function start(payload) {
     void dwposeAvailable().then(available => { dwposeReady = available; refreshPeople(); });
     loadModel(doc.pose);
     rebuildPassives();
+    movementGizmo = createMovementGizmo(viewer, {
+        getTransform: () => doc.transform,
+        onStart: manualPlacement,
+        onChange: transform => {
+            for (const [axis, id] of [['x', 'tx'], ['y', 'ty'], ['z', 'tz']]) {
+                transform[axis] = clamp(transform[axis], Number($('#' + id).min), Number($('#' + id).max));
+            }
+            doc.transform = transform;
+            viewer.setActiveCharacterAppearance({ transform });
+            refreshControls(); schedulePreview();
+        },
+    });
     setupInteraction();
     ready = true;
     if (restored) updateCamera(true);
@@ -1514,6 +1557,7 @@ function dispose() {
     clearTimeout(autoFitTimer); clearTimeout(previewTimer); clearTimeout(morphTimer);
     previewRevision++;
     stageObserver.disconnect();
+    movementGizmo?.dispose();
     viewer.renderer?.forceContextLoss();
     viewer.dispose();
     pack = null;

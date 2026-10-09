@@ -28,4 +28,6 @@ python tests/e2e/cdp_run.py tests/e2e/studio_interaction.js --base http://127.0.
 
 `tools/upgrade_studio_workflow.js` 是统一工作流加入「Fisher 镜头」节点时的一次性迁移脚本（同样用 `cdp_run.py` 运行），留作记录。
 
+`e2e/movement_gizmo.js` 是 Playwright 函数，传入已打开编辑器的隔离页面执行。实际鼠标拖动 X/Y/Z，检查单轴约束、人物与骨骼隔离、撤销重做、输出隐藏轴、双人切换、保存重开及镜头/关节工具恢复。
+
 `tests/fixtures/` 保留升级前的两份工作流，用于旧版本兼容测试，不作为用户入口。
