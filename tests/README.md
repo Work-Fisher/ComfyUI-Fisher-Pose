@@ -31,3 +31,20 @@ python tests/e2e/cdp_run.py tests/e2e/studio_interaction.js --base http://127.0.
 `e2e/movement_gizmo.js` 是 Playwright 函数，传入已打开编辑器的隔离页面执行。实际鼠标拖动 X/Y/Z，检查单轴约束、人物与骨骼隔离、撤销重做、输出隐藏轴、双人切换、保存重开及镜头/关节工具恢复。
 
 `tests/fixtures/` 保留升级前的两份工作流，用于旧版本兼容测试，不作为用户入口。
+
+## English / Chinese interface regression
+
+```bash
+node --test tests/test_i18n.mjs
+```
+
+The locale tests cover ComfyUI settings events, store-only changes, fallback languages, and preservation of interpolated names.
+
+For the DOM and real WebGL editor checks, install Playwright in your test environment, serve the repository root in one terminal, and run the browser test in another:
+
+```bash
+python -m http.server 8765 --bind 127.0.0.1
+CHROME=/path/to/chrome node tests/test_editor_language.cjs
+```
+
+`FISHER_TEST_BASE` can select another local preview URL. The test switches both actual editors through English → Chinese → English and verifies that dropdown values, pose/state JSON, and generated prompt text stay identical. It also checks dynamic messages, attributes, and exclusion of user names and editable text. It does not queue image generation or require a ComfyUI backend. Set `FISHER_SCREENSHOT_DIR` to an existing directory to save preview screenshots.

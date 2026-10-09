@@ -13,6 +13,8 @@ import { COMMON_POSES, directionKeypoints } from './common-poses.mjs';
 import { isGroupPose, bindingRuntimeProblem } from '../binding_runtime.mjs';
 import { reconcilePortraits } from '../portrait_inputs.mjs';
 import { DEFAULT_FRAMING, frontFraming, isTurned, outputShot } from './framing.mjs?v=20261010-feedback2';
+import { translate } from '../i18n.mjs';
+const uiText = text => translate(text, document.documentElement.lang);
 
 const $ = selector => document.querySelector(selector);
 const embedded = new URLSearchParams(location.search).has('embedded');
@@ -541,13 +543,15 @@ const entryLabel = entry => entry.name.replace(/_bone_structure|\.(png|jpe?g|web
 function renderGallery() {
     const gallery = galleries[gallerySource];
     const filter = $('#gallery-filter').value.trim().toLowerCase();
-    const shown = gallery.filter(entry => entry.name.toLowerCase().includes(filter));
+    const shown = gallery.filter(entry => entry.name.toLowerCase().includes(filter)
+        || (entry.spec && uiText(entryLabel(entry)).toLowerCase().includes(filter)));
     const container = $('#gallery');
     container.replaceChildren(...shown.map(entry => {
         const button = document.createElement('button');
         button.className = 'fp-thumb' + (entry.spec ? ' fp-mannequin' : '') + (entry.failed ? ' failed' : '') + (doc.openpose?.key === entry.key ? ' active' : '');
         button.dataset.key = entry.key;
         button.title = entry.name;
+        if (!entry.spec) button.setAttribute('data-i18n-skip', '');
         button.innerHTML = `<img loading="lazy" alt=""><span></span>`;
         button.querySelector('img').src = entry.url;
         button.querySelector('span').textContent = entryLabel(entry);
@@ -625,7 +629,7 @@ async function addFiles(files) {
 }
 
 $('#clear-gallery').onclick = async () => {
-    if (!libraryAvailable || !confirm(`清空我的图库中的 ${galleries.library.length} 张骨架图？\n（删除 ComfyUI/input/fisher_openpose 里的副本，原文件夹和 FISHER小彩蛋 不受影响）`)) return;
+    if (!libraryAvailable || !confirm(uiText(`清空我的图库中的 ${galleries.library.length} 张骨架图？\n（删除 ComfyUI/input/fisher_openpose 里的副本，原文件夹和 FISHER小彩蛋 不受影响）`))) return;
     await fetch(LIBRARY_URL + '/clear', { method: 'POST' });
     await loadLibrary();
     toast('我的图库已清空');
@@ -668,6 +672,7 @@ function renderSaved() {
         button.title = `${entry.name}\n点击载入`;
         button.innerHTML = '<img alt=""><span></span><i class="fp-delete" title="删除">×</i>';
         button.querySelector('img').src = entry.thumbnail;
+        button.querySelector('span').setAttribute('data-i18n-skip', '');
         button.querySelector('span').textContent = entry.name;
         button.onclick = event => (event.target.closest('.fp-delete') ? deleteSavedPose(entry) : loadSavedPose(entry));
         return button;
@@ -699,7 +704,7 @@ const postPose = (name, record, overwrite) => fetch(SAVED_URL, {
 
 async function saveCurrentPose(presetName) {
     if (!savedAvailable || !ready) return;
-    const name = (typeof presetName === 'string' ? presetName : prompt('给这个姿势起个名字', defaultPoseName()))?.trim();
+    const name = (typeof presetName === 'string' ? presetName : prompt(uiText('给这个姿势起个名字'), defaultPoseName()))?.trim();
     if (!name) return;
     await viewer.waitForCaptureReady();
     const scale = 256 / Math.max(doc.width, doc.height);
@@ -713,7 +718,7 @@ async function saveCurrentPose(presetName) {
     try {
         let response = await postPose(name, record, false);
         if (response.status === 409) {
-            if (!confirm(`已有名为「${name}」的姿势，要覆盖吗？`)) return;
+            if (!confirm(uiText(`已有名为「${name}」的姿势，要覆盖吗？`))) return;
             response = await postPose(name, record, true);
         }
         const result = await response.json();
@@ -745,7 +750,7 @@ async function loadSavedPose(entry) {
 }
 
 async function deleteSavedPose(entry, skipConfirm = false) {
-    if (!skipConfirm && !confirm(`删除姿势「${entry.name}」？`)) return;
+    if (!skipConfirm && !confirm(uiText(`删除姿势「${entry.name}」？`))) return;
     try {
         await fetch(`${SAVED_URL}/${encodeURIComponent(entry.name)}/delete`, { method: 'POST' });
         if (activeSavedName === entry.name) activeSavedName = null;
