@@ -85,6 +85,10 @@ const base = process.env.FISHER_TEST_BASE || 'http://127.0.0.1:8765';
   if(name==='freepose')await page.waitForFunction(()=>window.freePose?.viewer?.skinnedMesh && document.querySelector('#loading').hidden,null,{timeout:90000});
   else await page.waitForTimeout(2000);
   if(name==='freepose') {
+   await page.locator('[data-pose-tool="move"]').click();
+   assert.equal(await page.locator('[data-pose-tool="move"]').textContent(),'Move Person · XYZ');
+   assert.equal(await page.locator('#movement-view').textContent(),'View Axes at an Angle');
+   assert.equal(await page.evaluate(()=>window.freePose.viewer.transform.object?.name),'Fisher person movement');
    assert.equal(await page.locator('#camera-switch-wrap .fp-toggle').textContent(),'Generate Camera View');
    assert.equal(await page.locator('#auto-fit').locator('..').textContent(),'Auto Fit Full Body');
    assert.match(await page.locator('#tz').locator('..').locator('.slider-label').last().textContent(),/^Depth \(Far ← → Near\)/);
@@ -102,6 +106,8 @@ const base = process.env.FISHER_TEST_BASE || 'http://127.0.0.1:8765';
   await page.evaluate(()=>window.postMessage({type:'fisher-language',locale:'zh'},location.origin));
   await page.waitForFunction(()=>document.querySelector('#cancel-editor').textContent==='取消');
   if(name==='freepose') {
+   assert.equal(await page.locator('[data-pose-tool="move"]').textContent(),'移动人物 · XYZ');
+   assert.equal(await page.locator('#movement-view').textContent(),'斜看三轴');
    assert.equal(await page.locator('#camera-switch-wrap .fp-toggle').textContent(),'换镜头生成');
    assert.equal(await page.locator('#detection-status').textContent(),'识别完成：可应用 6 段肢体。未识别的部位保持人偶现有姿势。');
   }
@@ -109,6 +115,16 @@ const base = process.env.FISHER_TEST_BASE || 'http://127.0.0.1:8765';
   await page.waitForFunction(()=>document.querySelector('#cancel-editor').textContent==='Cancel');
   const after=await page.evaluate(()=>({state:JSON.stringify(window.freePose?.doc || window.poseStudio?.snapshot()),description:document.querySelector('#description').textContent, values:[...document.querySelectorAll('select')].map(s=>[s.id,s.value,[...s.options].map(o=>o.value)])}));
   assert.deepEqual(after,before);
+  if(name==='freepose') {
+   assert.equal(await page.locator('[data-pose-tool="move"]').getAttribute('aria-pressed'),'true');
+   assert.equal(await page.evaluate(()=>window.freePose.viewer.transform.object?.name),'Fisher person movement');
+   const shot=await page.evaluate(()=>JSON.stringify(window.freePose.doc.anyAngle));
+   await page.locator('#movement-view').click();
+   assert.equal(await page.evaluate(()=>JSON.stringify(window.freePose.doc.anyAngle)),shot);
+   await page.locator('[data-pose-tool="joints"]').click();
+   assert.equal(await page.evaluate(()=>window.freePose.viewer.transform.mode),'rotate');
+   assert.equal(await page.evaluate(()=>window.freePose.viewer.options.enablePoseInteraction),true);
+  }
   console.log(name,'actual editor locale round trip preserved dropdown values and generated prompt');
  }
  assert.deepEqual(errors, [], 'browser runtime errors');

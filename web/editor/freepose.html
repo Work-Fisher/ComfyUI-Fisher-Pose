@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Fisher Pose · 姿势与镜头</title><link rel="icon" href="data:,"><link rel="stylesheet" href="style.css"><link rel="stylesheet" href="freepose.css?v=20261006-default2"></head>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Fisher Pose · 姿势与镜头</title><link rel="icon" href="data:,"><link rel="stylesheet" href="style.css"><link rel="stylesheet" href="freepose.css?v=20261010-xyz1"></head>
 <body>
 <header class="appbar"><div class="brand"><span class="brand-icon">⌘</span><b>Fisher Pose</b><span class="divider"></span><span>姿势与镜头</span><small>摆好动作，定好镜头，再生成</small></div><div class="header-actions"><span id="save-status">编辑后应用到节点</span><button id="undo" title="撤销 Ctrl+Z">↶ 撤销</button><button id="redo" title="重做 Ctrl+Shift+Z">↷</button><button id="cancel-editor">取消</button><button id="apply-editor" disabled>仅应用</button><button class="primary" id="generate-editor" hidden>应用并生成</button></div></header>
 <main class="fp-main">
@@ -39,7 +39,7 @@
 </aside>
 <div class="workspace"><div class="fp-workflow-bar"><div class="segmented fp-modes"><button id="mode-pose" class="active">1 摆姿势</button><button id="mode-camera">2 定镜头</button></div><p id="mode-help">拖关节摆动作，拖空白处换方向观察。观察方向不改变镜头。</p></div><div class="stage fp-stage" id="stage"><canvas id="viewport-canvas" tabindex="0"></canvas>
 <div class="stage-top"><div class="stage-label"><i></i>橙框 = 最终拍摄范围</div><div class="fp-people" id="people" title="人物编号绑定参考人物，移动人偶不会交换身份"><button data-person="0" class="active">人物 1</button><button data-person="1" hidden>人物 2<i id="remove-person" title="删除人物 2">×</i></button><button id="add-person">＋ 第二个人</button></div><button id="snap-view" class="fp-chip">回到拍摄视角</button></div>
-<figure class="fp-inset"><img id="inset-preview" alt="最终机位预览"><figcaption>最终机位 · 人偶示意</figcaption></figure>
+<div id="movement-tools" class="fp-movement-tools"><div class="fp-tool-buttons" role="group" aria-label="人物编辑工具"><button data-pose-tool="joints" aria-pressed="true">摆关节</button><button data-pose-tool="move" aria-pressed="false">移动人物 · XYZ</button><button id="movement-view" title="仅斜向观察，方便拖动三轴；不改变拍摄镜头" hidden>斜看三轴</button></div><div id="movement-legend" hidden><span class="axis-x">X 左右</span><span class="axis-y">Y 上下</span><span class="axis-z">Z 前后</span></div></div><figure class="fp-inset"><img id="inset-preview" alt="最终机位预览"><figcaption>最终机位 · 人偶示意</figcaption></figure>
 <div class="stage-bottom"><span id="selection-hint">拖空白处转视角 · 拖关节摆姿 · Shift+拖 移动人物</span></div>
 <div id="env-banner" class="fp-banner" role="alert" hidden></div>
 <div id="loading" class="fp-loading"><div class="fp-spinner"></div><span id="loading-text">正在加载 MakeHuman 人体（约 86MB）…</span></div><div id="toast" role="status"></div></div>
@@ -88,4 +88,4 @@
 </aside></main>
 <footer class="app-footer"><span>Fisher Pose <span class="footer-dot">/</span> Free Pose · mannequin core © MiuProject (MIT)</span><span>调整完成后点「应用并生成」</span></footer>
 <script type="module">import { localizeEditor } from "../editor_i18n.mjs"; localizeEditor();</script>
-<script type="module" src="freepose.mjs?v=20261010-feedback2"></script></body></html>
+<script type="module" src="freepose.mjs?v=20261010-xyz1"></script></body></html>
