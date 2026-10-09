@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readPoseKeypoints, requireBody, largestBody } from '../web/editor/pose-keypoints.mjs';
+import { readPoseKeypoints, requireBody, largestBody, applicableBody } from '../web/editor/pose-keypoints.mjs';
 import { ORDER } from '../web/editor/state.mjs';
 const triples = Array.from({ length: 18 }, (_, i) => [10.25 + i * 3, 20.75 + i * 5, 1]);
 const frame = { canvas_width: 512, canvas_height: 768, people: [{ pose_keypoints_2d: triples.flat() }] };
@@ -21,4 +21,9 @@ const invalid = structuredClone(frame);
 invalid.people[0].pose_keypoints_2d[0] = NaN;
 assert.throws(() => requireBody(readPoseKeypoints(invalid).people[0]), /关节不完整/);
 assert.equal(largestBody([{ head: [1, 1], la: [1, 5] }, detected.people[0]]), detected.people[0]);
+const halfBody = Object.fromEntries(Object.entries(detected.people[0]).filter(([key]) => !['lh', 'rh', 'lk', 'rk', 'la', 'ra'].includes(key)));
+assert.equal(applicableBody(halfBody).complete, false);
+assert.equal(applicableBody(halfBody).segments.length, 4);
+assert.equal(applicableBody(detected.people[0]).complete, true);
+assert.throws(() => applicableBody({ head: [1, 2] }), /可用的手臂或腿部/);
 console.log('pose-keypoints: original coordinates, formats, missing joints and selection passed');

@@ -72,3 +72,13 @@ def register_routes():
     async def get_studio_workflow(request):
         from pathlib import Path
         return web.FileResponse(Path(__file__).parent / "workflows" / "【Work-Fisher】无限姿势+无限视角（支持双人）.json")
+
+    @routes.get("/fisher_pose/body_pack")
+    async def get_body_pack(request):
+        from pathlib import Path
+        root = Path(__file__).parent / "web" / "vnccs" / "assets"
+        for name in ("pose_studio_makehuman.v2.bin", "pose_studio_makehuman.v2.bin.gz"):
+            path = root / name
+            if path.is_file():
+                return web.FileResponse(path, headers={"Content-Type": "application/x-fisher-pose", "Cache-Control": "no-cache"})
+        raise web.HTTPNotFound(text="人体数据文件缺失，请重新安装完整 Fisher Pose 插件。")

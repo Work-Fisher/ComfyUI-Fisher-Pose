@@ -15,6 +15,9 @@
     throw Error('Editor did not finish loading');
   }
   const frame = await open(), fp = frame.contentWindow.freePose, d = frame.contentDocument;
+  // Finish input-change fitting before isolating detection's effect on the pose.
+  await fp.serialize();
+  fp.setAutoFit(false);
   d.querySelector('#use-person-photo').click();
   for (let i = 0; i < 30 && d.querySelector('#detect-person').disabled; i++) await sleep(200);
   assert(!d.querySelector('#detect-person').disabled, 'Supply a photo and install DWPose');

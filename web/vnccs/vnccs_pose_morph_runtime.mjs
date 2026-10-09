@@ -79,8 +79,8 @@ export function parseMorphPack(buffer) {
     };
 }
 
-export async function loadMorphPack(url = POSE_STUDIO_MAKEHUMAN_ASSET_URL) {
-    const response = await fetch(url);
+export async function loadMorphPack(url = POSE_STUDIO_MAKEHUMAN_ASSET_URL, requestOptions) {
+    const response = await fetch(url, requestOptions);
     if (!response.ok) throw new Error(`Failed to load Pose Studio MakeHuman asset: HTTP ${response.status}`);
     return parseMorphPack(await decompressIfNeeded(await response.arrayBuffer()));
 }

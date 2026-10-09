@@ -1,15 +1,17 @@
+import { loadBodyPack } from './body-pack.mjs?v=20261010-feedback2';
 // Free-pose editor: one VNCCS MakeHuman mannequin. Editing uses a free orbit view;
 // the output is always the VNCCS front capture (yaw 0 / pitch 0, white background,
 // flat white ambient light), which is what the VNCCS_QI2_PoseStudio LoRA was trained on.
 import { PoseViewerCore } from '../vnccs/vnccs_pose_studio_core.mjs?v=20261005-skeleton1';
-import { loadMorphPack, solveMorph, buildStaticModelData } from '../vnccs/vnccs_pose_morph_runtime.mjs';
+import { solveMorph, buildStaticModelData } from '../vnccs/vnccs_pose_morph_runtime.mjs';
 import { HAND_PRESETS } from '../vnccs/vnccs_hand_presets.mjs';
 import { readSkeletonImage } from './pose-import.mjs';
-import { readPoseKeypoints, largestBody, requireBody, poseOverlay } from './pose-keypoints.mjs';
+import { readPoseKeypoints, largestBody, applicableBody, poseOverlay } from './pose-keypoints.mjs?v=20261010-feedback2';
 import { liftOpenPose, WORLD_KEYPOINT_NAMES } from './openpose-lift.mjs';
 import { COMMON_POSES, directionKeypoints } from './common-poses.mjs';
 import { isGroupPose, bindingRuntimeProblem } from '../binding_runtime.mjs';
 import { reconcilePortraits } from '../portrait_inputs.mjs';
+import { DEFAULT_FRAMING, frontFraming, isTurned, outputShot } from './framing.mjs?v=20261010-feedback2';
 
 const $ = selector => document.querySelector(selector);
 const embedded = new URLSearchParams(location.search).has('embedded');
@@ -39,25 +41,13 @@ const PROPORTION_GROUPS = {
 };
 // Our 2D joint names → MakeHuman bones whose head sits on that joint.
 const JOINT_BONES = { ls: 'upperarm_l', le: 'lowerarm_l', lw: 'hand_l', rs: 'upperarm_r', re: 'lowerarm_r', rw: 'hand_r', lh: 'thigh_l', lk: 'calf_l', la: 'foot_l', rh: 'thigh_r', rk: 'calf_r', ra: 'foot_r' };
-// The MakeHuman body pack ships uncompressed: cloud drives (网盘) delete archive files such as the
-// upstream .bin.gz, which left the editor stuck on loading. The .gz is only a fallback for old copies;
-// the VNCCS loader accepts both (it checks the gzip magic bytes).
-const BODY_PACK_URLS = ['pose_studio_makehuman.v2.bin', 'pose_studio_makehuman.v2.bin.gz'].map(name => new URL(`../vnccs/assets/${name}`, import.meta.url));
-
-async function loadBodyPack() {
-    for (const url of BODY_PACK_URLS) {
-        try { return await loadMorphPack(url); } catch { /* missing or truncated: try the next copy */ }
-    }
-    throw new Error('人体数据文件缺失或不完整（web/vnccs/assets/pose_studio_makehuman.v2.bin，约 86MB）。可能被网盘删除或没下载完整，请从 GitHub 重新下载插件：github.com/Work-Fisher/ComfyUI-Fisher-Pose');
-}
-
 const NO_NEW_ANGLE = { enabled: false, yaw: 0, pitch: 0, zoom: 1, offsetX: 0, offsetY: 0 };
 let studio = { camera: false, canGenerate: false, canOpenWorkflow: false };
 let editMode = 'pose';
 let previewRevision = 0;
 let autoFitTimer = null;
 let fitting = false;
-let doc = { mesh: { ...DEFAULT_MESH }, proportions: { ...DEFAULT_PROPORTIONS }, pose: null, transform: { ...NEUTRAL_TRANSFORM }, width: 1024, height: 1024, openpose: null, referenceMode: 'group', swapPeople: false, outputSkeleton: true, autoFit: true, anyAngle: { ...NO_NEW_ANGLE } };
+let doc = { mesh: { ...DEFAULT_MESH }, proportions: { ...DEFAULT_PROPORTIONS }, pose: null, transform: { ...NEUTRAL_TRANSFORM }, width: 1024, height: 1024, openpose: null, referenceMode: 'group', swapPeople: false, outputSkeleton: true, autoFit: true, framing: { ...DEFAULT_FRAMING }, anyAngle: { ...NO_NEW_ANGLE } };
 let extraPrompt = '';
 let pack = null;
 let ready = false;
@@ -86,7 +76,8 @@ function instructionText() {
     }
     return `Draw the ${first} character from image2 in the pose of the ${first} mannequin in image1, and the ${second} character from image3 in the pose of the ${second} mannequin in image1.`;
 }
-const promptText = () => [instructionText(), ...extraPrompt.split('\n').map(line => line.trim())].filter(Boolean).join('\n');
+const SKELETON_GUIDE_INSTRUCTION = 'The colored skeleton lines and joint markers in image1 are pose guides only; omit them from the finished image.';
+const promptText = () => [instructionText(), doc.outputSkeleton ? SKELETON_GUIDE_INSTRUCTION : '', ...extraPrompt.split('\n').map(line => line.trim())].filter(Boolean).join('\n');
 
 function toast(text) {
     const element = $('#toast');
@@ -185,9 +176,9 @@ function loadModel(pose) {
     viewer.setActiveCharacterAppearance({ color: '#ffffff', transform: doc.transform });
 }
 
-// The capture camera never moves; `snap` also brings the free editing view back to it.
-function shotArgs(width = studio.outputWidth || doc.width, height = studio.outputHeight || doc.height) {
-    const angle = doc.anyAngle.enabled ? doc.anyAngle : NO_NEW_ANGLE;
+// Preview the enabled output; serialization can explicitly retain the inactive camera.
+function shotArgs(width = studio.outputWidth || doc.width, height = studio.outputHeight || doc.height, cameraEnabled = studio.cameraEnabled !== false) {
+    const angle = outputShot(doc, cameraEnabled);
     return [width, height, angle.zoom, angle.offsetX, angle.offsetY, angle.yaw, -angle.pitch];
 }
 
@@ -209,12 +200,14 @@ function autoFrame() {
     fitting = true;
     try {
         // Keep the trained front reference fully framed, then fit the chosen shot.
+        doc.framing = { ...DEFAULT_FRAMING };
         frameEveryone(false);
         if (studio.camera && doc.anyAngle.enabled) {
             const THREE = viewer.THREE, angle = doc.anyAngle;
             angle.zoom = 1; angle.offsetX = 0; angle.offsetY = 0;
             const bounds = () => {
-                viewer.updateCaptureCamera(...shotArgs());
+                // Fit the saved shot even when its generation branch is disabled.
+                viewer.updateCaptureCamera(...shotArgs(undefined, undefined, true));
                 viewer.captureCamera.updateMatrixWorld(true);
                 return measurePeople().ndc;
             };
@@ -271,7 +264,8 @@ function fitFrame(snap = false) {
 
 function capture(width, height) {
     viewer.updateLights(CAPTURE_LIGHTS);
-    return viewer.capture(width, height, 1, CAPTURE_BACKGROUND, 0, 0, FRONT.yaw, FRONT.pitch, doc.outputSkeleton);
+    const framing = doc.framing;
+    return viewer.capture(width, height, framing.zoom, CAPTURE_BACKGROUND, framing.offsetX, framing.offsetY, FRONT.yaw, FRONT.pitch, doc.outputSkeleton);
 }
 
 function schedulePreview() {
@@ -312,7 +306,7 @@ function restJoints() {
 // `build(rest, head)` returns relative to the hip midpoint (as {kps, ...extra}); returns extra.
 function importKeypoints(build) {
     viewer.recordState();
-    const keep = doc.people ? { ...doc.transform } : null; // with two people, a new pose must not move anyone
+    const keep = doc.people || !doc.autoFit ? { ...doc.transform } : null; // with two people, a new pose must not move anyone
     doc.transform = { ...NEUTRAL_TRANSFORM };
     viewer.setActiveCharacterAppearance({ transform: doc.transform });
     resetPose();
@@ -328,10 +322,15 @@ function importKeypoints(build) {
 }
 
 // After a new pose: one person is re-framed; two people keep their layout.
-const refit = snap => (doc.people ? updateCamera(snap) : fitFrame(snap));
+const refit = snap => (doc.people || !doc.autoFit ? updateCamera(snap) : fitFrame(snap));
 
 function applyOpenPose() {
     const { points, flips } = doc.openpose;
+    if (doc.openpose.key === 'photo' && !applicableBody(points).complete) {
+        applyVisibleSegments(points);
+        refreshFlips();
+        return false;
+    }
     const { facingAway } = importKeypoints((rest, head) => {
         const lifted = liftOpenPose(points, rest, flips, doc.openpose.depthMode);
         // The spine IK target is the head bone origin, not the nose: keep the nose direction at head-bone distance.
@@ -344,6 +343,28 @@ function applyOpenPose() {
     refit(true);
     refreshFlips(facingAway);
     return facingAway;
+}
+
+// Cropped/occluded photos can still supply useful limbs. Only rotate observed segments;
+// keep the torso, unobserved joints, body lengths and the other mannequin as they were.
+function applyVisibleSegments(points) {
+    const { segments } = applicableBody(points);
+    const THREE = viewer.THREE;
+    viewer.recordState();
+    for (const [a, b, boneName, childName] of segments) {
+        const bone = viewer.bones[boneName], child = viewer.bones[childName];
+        const from = bone.getWorldPosition(new THREE.Vector3());
+        const current = child.getWorldPosition(new THREE.Vector3()).sub(from).normalize();
+        const target = new THREE.Vector3(points[b][0] - points[a][0], points[a][1] - points[b][1], 0).normalize();
+        const delta = new THREE.Quaternion().setFromUnitVectors(current, target);
+        const world = bone.getWorldQuaternion(new THREE.Quaternion());
+        const parent = bone.parent.getWorldQuaternion(new THREE.Quaternion()).invert();
+        bone.quaternion.copy(parent.multiply(delta).multiply(world));
+        bone.updateMatrixWorld(true);
+    }
+    viewer.skeleton?.update();
+    viewer.updateIKEffectorPositions?.(); viewer.updateMarkers?.(); viewer.requestRender();
+    refit(true);
 }
 
 // 常用姿势: direction specs (common-poses.mjs) solved on the current body, so they fit any shape.
@@ -387,12 +408,13 @@ function pickOption(options, preferred) {
 }
 
 async function detectPersonPose() {
-    const status = $('#import-status');
+    const status = $('#detection-status');
     const button = $('#detect-person');
     if (!posePhoto || detectingPose || !dwposeReady) return;
     const source = { ...posePhoto };
     detectedPose = null;
     $('#detected-pose').hidden = true;
+    $('#apply-detected-pose').disabled = true;
     detectingPose = true;
     refreshPosePhoto();
     button.disabled = true;
@@ -438,15 +460,18 @@ async function detectPersonPose() {
         const keypoints = result.outputs?.['4']?.text?.[0];
         if (!keypoints) throw new Error('没有得到原始关节点，请更新 ComfyUI 后重新识别');
         const detection = readPoseKeypoints(keypoints);
+        const body = applicableBody(largestBody(detection.people));
         const photo = new Image(); photo.src = source.url; await photo.decode();
         detectedPose = { image, name: source.name, ...detection, overlay: poseOverlay(photo, detection) };
         $('#pose-preview-overlay').checked = true;
         $('#detected-pose-preview').src = detectedPose.overlay;
         $('#download-detected-pose').href = image.src;
         $('#detected-pose').hidden = false;
-        status.textContent = '已将关节点叠在原图上，人偶尚未改变。确认肩、肘、腕、髋、膝和脚踝后再应用；手指不在本次识别范围内。';
+        status.textContent = body.complete ? '识别完成，请点击下方「应用」。手指需单独调整。'
+            : `识别完成：可应用 ${body.segments.length} 段肢体。未识别的部位保持人偶现有姿势。`;
+        $('#apply-detected-pose').disabled = false;
     } catch (error) {
-        status.textContent = `识别失败：${error.message.includes('未识别到') ? '图里没有检测到完整的人' : error.message}`;
+        status.textContent = `识别失败：${error.message}`;
     } finally { detectingPose = false; refreshPosePhoto(); }
 }
 
@@ -470,6 +495,8 @@ function refreshFlips(facingAway) {
     $('#depth-section').hidden = !doc.openpose;
     const flips = doc.openpose?.flips || {};
     const planar = doc.openpose?.depthMode === 'planar';
+    const partial = doc.openpose?.key === 'photo' && !applicableBody(doc.openpose.points).complete;
+    $('[data-depth-mode="estimate"]').disabled = partial;
     for (const button of document.querySelectorAll('[data-depth-mode]')) button.classList.toggle('active', button.dataset.depthMode === (planar ? 'planar' : 'estimate'));
     $('#depth-flips').hidden = planar;
     for (const button of document.querySelectorAll('[data-flip]')) button.classList.toggle('on', Boolean(flips[button.dataset.flip]));
@@ -740,6 +767,7 @@ function selectPosePhoto(url, name, owned = false) {
     if (posePhoto?.owned) URL.revokeObjectURL(posePhoto.url);
     posePhoto = { url, name, owned };
     detectedPose = null;
+    $('#detection-status').textContent = '';
     $('#detected-pose').hidden = true;
     $('#pose-photo-preview').src = url;
     $('#pose-photo-name').textContent = name;
@@ -764,12 +792,17 @@ $('#pose-preview-overlay').onchange = event => {
 $('#apply-detected-pose').onclick = () => {
     if (!detectedPose) return;
     try {
-        const points = requireBody(largestBody(detectedPose.people));
+        const points = largestBody(detectedPose.people);
+        const body = applicableBody(points);
         doc.openpose = { key: 'photo', name: detectedPose.name, points, flips: {}, depthMode: 'planar' };
         applyOpenPose();
         const count = detectedPose.people.length > 1 ? `图中有 ${detectedPose.people.length} 人，已取最大的一个。` : '';
-        $('#import-status').textContent = `已按原图关节点贴合动作。${count}当前保留二维方向；需要前后深度可在下方切换「估算立体」。手势需单独调整。`;
-    } catch (error) { $('#import-status').textContent = `应用失败：${error.message}`; }
+        $('#import-status').textContent = body.complete ? `已按原图关节点贴合动作。${count}当前保留二维方向；需要前后深度可在下方切换「估算立体」。手势需单独调整。`
+            : `已应用可见肢体。${count}未识别的部位保持原姿势，手势需单独调整。`;
+        $('#detection-status').textContent = body.complete ? `已应用到人物 ${(doc.active ?? 0) + 1}。${count}`
+            : `已应用 ${body.segments.length} 段可见肢体；未识别部位保持原姿势。${count}`;
+        toast($('#detection-status').textContent);
+    } catch (error) { $('#detection-status').textContent = `应用失败：${error.message}`; toast($('#detection-status').textContent); }
 };
 
 // --- Two people -------------------------------------------------------------
@@ -874,6 +907,9 @@ function removePerson() {
 function measurePeople() {
     const THREE = viewer.THREE;
     const camera = viewer.captureCamera, v = new THREE.Vector3(), box = new THREE.Box3(), ndc = new THREE.Box2();
+    // Fitting switches between front and shot cameras before a render occurs.
+    // Project against the current camera, not the previous rendered view.
+    camera.updateMatrixWorld(true);
     const meshes = [viewer.skinnedMesh, ...[...viewer.passiveCharacters.values()].map(entry => entry.mesh)].filter(Boolean);
     for (const mesh of meshes) {
         mesh.updateMatrixWorld(true);
@@ -896,7 +932,7 @@ function measurePeople() {
 // the splat whatever its scale.
 function anyAngleCamera() {
     const THREE = viewer.THREE;
-    viewer.updateCaptureCamera(...shotArgs());
+    viewer.updateCaptureCamera(...shotArgs(undefined, undefined, true));
     const camera = viewer.captureCamera;
     camera.updateMatrixWorld(true);
     const { box } = measurePeople();
@@ -911,6 +947,9 @@ function anyAngleCamera() {
 
 function refreshAngle() {
     const angle = doc.anyAngle;
+    $('#camera-switch-wrap').hidden = !studio.camera;
+    $('#camera-enabled').checked = studio.cameraEnabled !== false;
+    $('#camera-switch-hint').textContent = studio.cameraEnabled === false ? '当前只生成姿势；开启后才执行旋转镜头。' : '转动镜头时执行多角度；正面缩放直接生成特写。';
     $('#auto-fit').checked = doc.autoFit;
     $('#output-skeleton').checked = doc.outputSkeleton;
     for (const key of ['yaw', 'pitch', 'zoom']) {
@@ -923,16 +962,14 @@ function refreshAngle() {
     $('#mode-camera').disabled = !studio.camera;
     $('#generate-editor').hidden = !studio.canGenerate;
     $('#shot-status').textContent = studio.cameraEnabled === false
-        ? '仅生成正面姿势图 · 多角度已关闭'
+        ? '仅生成姿势 · 预览为实际输出构图'
         : angle.enabled ? '按当前镜头生成' : '正面镜头';
     $('#final-size').textContent = `${studio.outputWidth || doc.width} × ${studio.outputHeight || doc.height}`;
     if (!studio.camera && angle.enabled) $('#camera-unavailable').textContent = '此工作流无法生成已保存的镜头。请打开完整工作流，或恢复正面镜头后应用。';
 }
 
-// Whether the shot needs the camera branch. With 自动撑满 on, zoom and offsets are derived by the
-// fit (rarely exactly 1/0), so only a turned camera counts; a hand-set framing counts when it is off.
-// Counting the fitted zoom kept 正面 stuck in the slow camera branch.
-function normalizeShot(angle, autoFit = doc.autoFit) {
+// Only rotation requires reconstruction. A front crop is part of the pose reference.
+function normalizeShot(angle) {
     const shot = { ...NO_NEW_ANGLE, ...angle };
     shot.yaw = clamp(Number(shot.yaw) || 0, -180, 180);
     shot.pitch = clamp(Number(shot.pitch) || 0, -60, 60);
@@ -940,9 +977,7 @@ function normalizeShot(angle, autoFit = doc.autoFit) {
     shot.offsetX = Number(shot.offsetX) || 0;
     shot.offsetY = Number(shot.offsetY) || 0;
     const turned = Math.abs(shot.yaw) > 0.01 || Math.abs(shot.pitch) > 0.01;
-    const framed = !autoFit && (Math.abs(shot.zoom - 1) > 0.001 || Math.abs(shot.offsetX) > 0.01 || Math.abs(shot.offsetY) > 0.01);
-    shot.enabled = turned || framed;
-    if (!shot.enabled) Object.assign(shot, { zoom: 1, offsetX: 0, offsetY: 0 });
+    shot.enabled = turned;
     return shot;
 }
 
@@ -950,6 +985,7 @@ function setAngle(values) {
     if (!studio.camera) return;
     if ('zoom' in values || 'offsetX' in values || 'offsetY' in values) setAutoFit(false);
     doc.anyAngle = normalizeShot({ ...doc.anyAngle, ...values });
+    if (!isTurned(doc.anyAngle)) doc.framing = frontFraming({ framing: doc.anyAngle });
     refreshAngle();
     updateCamera(editMode === 'camera');
     requestAutoFit();
@@ -969,11 +1005,16 @@ function setEditMode(mode) {
     viewer.orbit.enabled = mode === 'pose';
 }
 
+$('#camera-enabled').onchange = event => {
+    studio.cameraEnabled = event.target.checked;
+    refreshAngle(); updateCamera(true);
+};
 $('#mode-pose').onclick = () => setEditMode('pose');
 $('#mode-camera').onclick = () => setEditMode('camera');
 for (const key of ['yaw', 'pitch', 'zoom']) $('#angle-' + key).oninput = event => setAngle({ [key]: Number(event.target.value) });
 for (const button of document.querySelectorAll('[data-angle-yaw]')) button.onclick = () => setAngle({ yaw: Number(button.dataset.angleYaw) });
 $('#reset-camera').onclick = () => {
+    doc.framing = { ...DEFAULT_FRAMING };
     doc.anyAngle = { ...NO_NEW_ANGLE };
     refreshAngle(); updateCamera(true);
 };
@@ -1159,6 +1200,7 @@ function refreshControls() {
     $('#zoom').value = doc.transform.zoom; setOutput('zoom', doc.transform.zoom.toFixed(2));
     $('#tx').value = doc.transform.x; setOutput('tx', doc.transform.x.toFixed(1));
     $('#ty').value = doc.transform.y; setOutput('ty', doc.transform.y.toFixed(1));
+    $('#tz').value = doc.transform.z; setOutput('tz', doc.transform.z.toFixed(1));
     const turn = Math.round(viewer.modelRotation?.y || 0);
     $('#turn').value = turn; setOutput('turn', `${turn}°`);
     $('#output-width').value = doc.width;
@@ -1195,7 +1237,7 @@ function manualPlacement() {
     toast('已关闭「自动撑满」，保留手动调整的位置和大小');
 }
 
-for (const [id, key] of [['zoom', 'zoom'], ['tx', 'x'], ['ty', 'y']]) {
+for (const [id, key] of [['zoom', 'zoom'], ['tx', 'x'], ['ty', 'y'], ['tz', 'z']]) {
     bindSlider($(`#${id}`), value => {
         manualPlacement();
         doc.transform = { ...doc.transform, [key]: value };
@@ -1235,7 +1277,13 @@ for (const side of ['l', 'r']) {
 $('#snap-view').onclick = () => updateCamera(true);
 $('#output-skeleton').onchange = event => { doc.outputSkeleton = event.target.checked; schedulePreview(); };
 $('#auto-fit').onchange = event => setAutoFit(event.target.checked);
-$('#fit-frame').onclick = $('#fit-frame-2').onclick = () => { viewer.recordState(); if (doc.people) frameEveryone(); else fitFrame(); };
+$('#fit-frame').onclick = $('#fit-frame-2').onclick = () => {
+    viewer.recordState();
+    const enabled = doc.autoFit;
+    doc.autoFit = true; autoFrame(); doc.autoFit = enabled;
+    if (!isTurned(doc.anyAngle)) doc.anyAngle = { ...NO_NEW_ANGLE };
+    refreshAngle(); updateCamera(true);
+};
 $('#reset-bone').onclick = () => { viewer.recordState(); viewer.resetSelectedBone(); refreshControls(); schedulePreview(); };
 $('#reset-pose').onclick = () => { viewer.recordState(); resetPose(); doc.openpose = null; refreshFlips(); refreshControls(); schedulePreview(); };
 $('#undo').onclick = () => viewer.undo();
@@ -1340,7 +1388,7 @@ async function serialize() {
     if (anyAngle.enabled) {
         const width = studio.outputWidth || doc.width, height = studio.outputHeight || doc.height;
         const scale = Math.min(1, 512 / Math.max(width, height));
-        const args = shotArgs(Math.round(width * scale), Math.round(height * scale));
+        const args = shotArgs(Math.round(width * scale), Math.round(height * scale), true);
         shotPreview = viewer.capture(args[0], args[1], args[2], CAPTURE_BACKGROUND, ...args.slice(3), doc.outputSkeleton);
         viewer.updateCaptureCamera(...shotArgs());
     }
@@ -1369,7 +1417,8 @@ function docFrom(saved) {
         ...first, people, active: 0, portraitState: saved.portraitState, referenceMode: saved.referenceMode || (secondReferenceConnected ? 'separate' : 'group'), swapPeople: saved.swapPeople === true, outputSkeleton: saved.outputSkeleton === true, autoFit: saved.autoFit !== false,
         // The mannequin size lives only here; the node's width/height are the separate output size.
         width: round16(Number(saved.width) || doc.width), height: round16(Number(saved.height) || doc.height),
-        anyAngle: saved.anyAngle?.enabled ? normalizeShot({ ...saved.anyAngle, camera: undefined }, saved.autoFit !== false) : { ...NO_NEW_ANGLE },
+        framing: frontFraming(saved),
+        anyAngle: normalizeShot({ ...saved.anyAngle, camera: undefined }),
     };
 }
 
@@ -1416,7 +1465,7 @@ async function start(payload) {
     void loadLibrary();
     void loadSavedList();
     await viewer.waitForCaptureReady();
-    if (payload?.inputsChanged) frameEveryone(true);
+    if (payload?.inputsChanged && doc.autoFit) frameEveryone(true);
     $('#loading').hidden = true;
     $('#apply-editor').disabled = false;
     $('#save-status').textContent = restored ? '已恢复姿势与镜头' : '先选姿势，再定镜头';
@@ -1436,7 +1485,7 @@ async function applyEditor(generate = false) {
     $('#save-status').textContent = generate ? '正在保存姿势并加入生成队列…' : '正在保存姿势…';
     try {
         const pose_json = await serialize();
-        parent.postMessage({ type: 'fisher-apply', payload: { pose_json, extra_prompt: extraPrompt }, generate }, location.origin);
+        parent.postMessage({ type: 'fisher-apply', payload: { pose_json, extra_prompt: extraPrompt, cameraEnabled: studio.cameraEnabled !== false }, generate }, location.origin);
         if (!studio.canGenerate) $('#apply-editor').disabled = false;
     } catch (error) { applicationError(error.message); }
 }

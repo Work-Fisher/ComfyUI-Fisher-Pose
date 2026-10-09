@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { scalarInput, cameraEnabled } from '../web/workflow_controls.mjs';
+import { scalarInput, cameraEnabled, setScalarInput } from '../web/workflow_controls.mjs';
 
 function connected(type, inputName, value) {
     const source = { type, widgets: [{ name: 'value', value }] };
@@ -26,6 +26,18 @@ test('connected false wins over default and can be restored without disconnectin
 test('old workflows without switch keep camera support', () => {
     assert.equal(cameraEnabled(null), true);
     assert.equal(cameraEnabled({ widgets: [] }), true);
+});
+
+test('editor switch updates the linked constant and callbacks, not a shadow widget', () => {
+    const { node, source } = connected('PrimitiveBoolean', 'enable_camera', false);
+    let called;
+    source.widgets[0].callback = value => { called = value; };
+    assert.equal(setScalarInput(node, 'enable_camera', true), true);
+    assert.equal(cameraEnabled(node), true);
+    assert.equal(called, true);
+    source.type = 'ComputedBoolean';
+    assert.equal(setScalarInput(node, 'enable_camera', false), false);
+    assert.equal(source.widgets[0].value, true);
 });
 
 test('unknown computed values do not reuse stale connected widget', () => {
