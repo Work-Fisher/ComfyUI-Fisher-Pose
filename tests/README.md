@@ -29,3 +29,20 @@ python tests/e2e/cdp_run.py tests/e2e/studio_interaction.js --base http://127.0.
 `tools/upgrade_studio_workflow.js` 是统一工作流加入「Fisher 镜头」节点时的一次性迁移脚本（同样用 `cdp_run.py` 运行），留作记录。
 
 `tests/fixtures/` 保留升级前的两份工作流，用于旧版本兼容测试，不作为用户入口。
+
+## English / Chinese interface regression
+
+```bash
+node --test tests/test_i18n.mjs
+```
+
+The locale tests cover ComfyUI settings events, store-only changes, fallback languages, and preservation of interpolated names.
+
+For the DOM and real WebGL editor checks, install Playwright in your test environment, serve the repository root in one terminal, and run the browser test in another:
+
+```bash
+python -m http.server 8765 --bind 127.0.0.1
+CHROME=/path/to/chrome node tests/test_editor_language.cjs
+```
+
+`FISHER_TEST_BASE` can select another local preview URL. The test switches both actual editors through English → Chinese → English and verifies that dropdown values, pose/state JSON, and generated prompt text stay identical. It also checks dynamic messages, attributes, and exclusion of user names and editable text. It does not queue image generation or require a ComfyUI backend. Set `FISHER_SCREENSHOT_DIR` to an existing directory to save preview screenshots.

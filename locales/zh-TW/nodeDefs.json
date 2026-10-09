@@ -1,0 +1,315 @@
+{
+  "FisherPoseStudio": {
+    "display_name": "Fisher 机位与姿态",
+    "inputs": {
+      "output_mode": {
+        "name": "output_mode"
+      },
+      "width": {
+        "name": "width"
+      },
+      "height": {
+        "name": "height"
+      },
+      "extra_prompt": {
+        "name": "extra_prompt"
+      },
+      "scene_json": {
+        "name": "scene_json"
+      }
+    },
+    "outputs": {
+      "0": {
+        "name": "提示词"
+      },
+      "1": {
+        "name": "人偶姿态图"
+      },
+      "2": {
+        "name": "镜头预览图"
+      }
+    },
+    "description": "支持 1–3 人独立摆姿、站位与共用机位。提示词接 prompt，拍摄框人偶姿态图接 image_2；原图直接接 image_1。仅视角时不连接姿态图输出。"
+  },
+  "FisherQwenPose": {
+    "display_name": "Fisher Qwen2.1 人物与姿态编码",
+    "inputs": {
+      "clip": {
+        "name": "clip"
+      },
+      "vae": {
+        "name": "vae"
+      },
+      "reference_image_1": {
+        "name": "reference_image_1"
+      },
+      "output_mode": {
+        "name": "output_mode"
+      },
+      "width": {
+        "name": "width"
+      },
+      "height": {
+        "name": "height"
+      },
+      "reference_resolution": {
+        "name": "reference_resolution"
+      },
+      "person_1_reference": {
+        "name": "person_1_reference"
+      },
+      "person_2_reference": {
+        "name": "person_2_reference"
+      },
+      "person_3_reference": {
+        "name": "person_3_reference"
+      },
+      "extra_prompt": {
+        "name": "extra_prompt"
+      },
+      "scene_json": {
+        "name": "scene_json"
+      },
+      "reference_image_2": {
+        "name": "reference_image_2"
+      },
+      "reference_image_3": {
+        "name": "reference_image_3"
+      },
+      "pe_clip": {
+        "name": "pe_clip"
+      },
+      "pe_max_tokens": {
+        "name": "pe_max_tokens"
+      },
+      "presence_penalty": {
+        "name": "presence_penalty"
+      },
+      "thinking": {
+        "name": "thinking"
+      },
+      "use_default_template": {
+        "name": "use_default_template",
+        "tooltip": "使用默认PE扩写系统模板；关闭后仅保留JSON输出格式约定。"
+      },
+      "mtp": {
+        "name": "mtp"
+      }
+    },
+    "outputs": {
+      "0": {
+        "name": "正向"
+      },
+      "1": {
+        "name": "负向"
+      },
+      "2": {
+        "name": "latent"
+      },
+      "3": {
+        "name": "实际提示词"
+      },
+      "4": {
+        "name": "人偶姿态图"
+      },
+      "5": {
+        "name": "镜头预览图"
+      }
+    },
+    "description": "Qwen Image 2.1 专用。人物参考图连续接入1–3；内部将人偶参考图放在最后一张并绑定正向提示词。自动：单图多人共用图1，多图按人物列表顺序对应。编辑器内上传仅用于骨架适配，不代替这些图像输入。"
+  },
+  "FisherQwen21GGUFCLIP": {
+    "display_name": "Fisher Qwen2.1 GGUF CLIP加载器",
+    "inputs": {
+      "clip_name": {
+        "name": "clip_name"
+      },
+      "vision_source": {
+        "name": "vision_source",
+        "tooltip": "选择配套mmproj F16 GGUF，或完整Qwen3-VL-8B safetensors的视觉部分。"
+      }
+    }
+  },
+  "FisherPoseImage": {
+    "display_name": "Fisher 人偶姿态图（通用）",
+    "inputs": {
+      "extra_prompt": {
+        "name": "extra_prompt"
+      },
+      "pose_json": {
+        "name": "pose_json"
+      },
+      "reference_image": {
+        "name": "reference_image"
+      }
+    },
+    "outputs": {
+      "0": {
+        "name": "人偶姿态图"
+      },
+      "1": {
+        "name": "提示词"
+      },
+      "2": {
+        "name": "姿势数据"
+      }
+    },
+    "description": "只输出人偶姿态图和提示词，不需要 clip / vae，可以接到任何图像编辑工作流里当姿势参考（例如 Qwen Image 2511）。人偶图接 image1、完整人物图接 image2（两张单人照模式才将第二张接 image3），提示词会按人数自动写好。"
+  },
+  "FisherQwenFreePose": {
+    "display_name": "Fisher Qwen2.1 自由姿势",
+    "inputs": {
+      "clip": {
+        "name": "clip"
+      },
+      "vae": {
+        "name": "vae"
+      },
+      "reference_image": {
+        "name": "reference_image"
+      },
+      "width": {
+        "name": "width"
+      },
+      "height": {
+        "name": "height"
+      },
+      "reference_resolution": {
+        "name": "reference_resolution"
+      },
+      "extra_prompt": {
+        "name": "extra_prompt"
+      },
+      "pose_json": {
+        "name": "pose_json"
+      },
+      "reference_image_2": {
+        "name": "reference_image_2"
+      }
+    },
+    "outputs": {
+      "0": {
+        "name": "正向"
+      },
+      "1": {
+        "name": "负向"
+      },
+      "2": {
+        "name": "latent"
+      },
+      "3": {
+        "name": "实际提示词"
+      },
+      "4": {
+        "name": "人偶姿态图"
+      },
+      "5": {
+        "name": "姿势数据"
+      }
+    },
+    "description": "Qwen Image 2.1 自由姿势（1–2 人）。配合 VNCCS_QI2_PoseStudio LoRA：人偶图为 image1、人物图为 image2；两人默认使用完整合照（不裁切）：原图左人绑定人偶1、右人绑定人偶2，可交换对应。两张单人照模式才接 reference_image_2（image3）。人偶图尺寸在编辑器里设置；节点 width/height 只决定输出图尺寸，可接分辨率节点，两者无需一致。"
+  },
+  "FisherAnyAngleCamera": {
+    "display_name": "Fisher AnyAngle 机位",
+    "inputs": {
+      "splat": {
+        "name": "splat"
+      },
+      "pose_json": {
+        "name": "pose_json"
+      },
+      "image": {
+        "name": "image",
+        "tooltip": "第一步的正面结果：粗渲染按它的尺寸出图"
+      },
+      "camera_latent": {
+        "name": "camera_latent",
+        "tooltip": "连接 TripoSplat 采样的 latent；其中的原始机位用于校准转角，不能接正面采样。"
+      }
+    },
+    "outputs": {
+      "0": {
+        "name": "粗渲染"
+      },
+      "1": {
+        "name": "AnyAngle提示词"
+      },
+      "2": {
+        "name": "camera_info"
+      }
+    },
+    "description": "把自由姿势编辑器里设的「新机位 · AnyAngle」放到高斯溅射上并渲出粗图。AnyAngle 那一步的 TextEncodeQwenImage21：正面结果接 image1、粗渲染接 image2，提示词接本节点，CFG 1、25 步。"
+  },
+  "FisherShot": {
+    "display_name": "Fisher 镜头",
+    "inputs": {
+      "pose_json": {
+        "name": "pose_json"
+      },
+      "shot_json": {
+        "name": "shot_json"
+      },
+      "enable_camera": {
+        "name": "enable_camera",
+        "tooltip": "关闭：只生成正面人物姿势图；开启：按编辑器镜头执行完整流程。关闭不会清除保存的镜头。"
+      }
+    },
+    "outputs": {
+      "0": {
+        "name": "姿势与镜头"
+      }
+    },
+    "description": "保存编辑器镜头。enable_camera 关闭时只输出正面人物姿势图，开启后恢复镜头流程；不清除镜头，也不改变正面生成参数。"
+  },
+  "FisherPoseResult": {
+    "display_name": "Fisher 最终图像",
+    "inputs": {
+      "pose_json": {
+        "name": "pose_json"
+      },
+      "front_image": {
+        "name": "front_image"
+      },
+      "camera_image": {
+        "name": "camera_image"
+      }
+    },
+    "outputs": {
+      "0": {
+        "name": "最终图像"
+      }
+    },
+    "description": "按编辑器保存的镜头自动选择结果。正面直接出图，调整镜头后自动换机位，无需手动切换工作流。"
+  },
+  "FisherAnyAngleEncode": {
+    "display_name": "Fisher 换机位编码",
+    "inputs": {
+      "clip": {
+        "name": "clip"
+      },
+      "vae": {
+        "name": "vae"
+      },
+      "front_image": {
+        "name": "front_image"
+      },
+      "camera_image": {
+        "name": "camera_image"
+      },
+      "resolution": {
+        "name": "resolution"
+      }
+    },
+    "outputs": {
+      "0": {
+        "name": "正向"
+      },
+      "1": {
+        "name": "负向"
+      },
+      "2": {
+        "name": "latent"
+      }
+    }
+  }
+}

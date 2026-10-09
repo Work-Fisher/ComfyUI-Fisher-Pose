@@ -20,6 +20,7 @@ export function setupReference(toast, onReferenceChange=()=>{}) {
             const previous=currentUrl;currentUrl=url;
             image.src=url;image.hidden=false;image.style.opacity=Number(opacity.value)/100;
             area.style.backgroundImage=`linear-gradient(#ffffffaa,#ffffffaa),url("${url}")`;
+            area.querySelector('b').setAttribute('data-i18n-skip', '');
             area.querySelector('b').textContent=file.name||'已放入参考图';
             area.querySelector('small').textContent=`${probe.naturalWidth} × ${probe.naturalHeight} · 点击替换 / Ctrl+V`;
             control.hidden=false;clear.hidden=false;
@@ -58,6 +59,7 @@ export function setupReference(toast, onReferenceChange=()=>{}) {
     opacity.oninput=()=>image.style.opacity=Number(opacity.value)/100;
     clear.onclick=()=>{
         revision++;onReferenceChange(null);image.hidden=true;image.removeAttribute('src');area.style.backgroundImage='none';
+        area.querySelector('b').removeAttribute('data-i18n-skip');
         area.querySelector('b').textContent='放入人物参考图';area.querySelector('small').textContent='点击选择 · 拖入文件 · Ctrl+V 粘贴';
         control.hidden=true;clear.hidden=true;input.value='';
         if(currentUrl)URL.revokeObjectURL(currentUrl);currentUrl=null;

@@ -131,3 +131,9 @@ button:focus-visible,summary:focus-visible{outline:2px solid #315acd;outline-off
 .pose-depth-mode button{flex:1}
 .pose-depth-hint{display:block;font-size:10px;line-height:1.7;color:#68758b;margin-bottom:10px}
 #depth-flips[hidden]{display:none}
+
+/* Allow longer English labels to fit the existing panels. */
+html[lang="en"] .panel-tabs{gap:4px}
+html[lang="en"] .panel-tabs button{flex:1;min-width:0;padding-left:3px;padding-right:3px;font-size:11px}
+html[lang="en"] .fp-flips{grid-template-columns:48px 1fr 1fr}
+html[lang="en"] .fp-hands{grid-template-columns:48px 1fr 1fr 1fr}
