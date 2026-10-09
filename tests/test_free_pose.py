@@ -41,6 +41,18 @@ def pose_json(size=(512, 768), color=(255, 255, 255)):
 
 
 class FreePoseTests(unittest.TestCase):
+    def test_skeleton_guides_are_not_requested_in_final_image(self):
+        from fisher_test.free_pose import SKELETON_GUIDE_INSTRUCTION
+        for two in (False, True):
+            data = {'outputSkeleton': True}
+            if two:
+                data['people'] = [{'transform': {'x': -1}}, {'transform': {'x': 1}}]
+            prompt = free_pose_prompt('Custom detail', json.dumps(data))
+            self.assertIn(SKELETON_GUIDE_INSTRUCTION, prompt)
+            self.assertTrue(prompt.endswith('Custom detail'))
+            data['outputSkeleton'] = False
+            self.assertNotIn(SKELETON_GUIDE_INSTRUCTION, free_pose_prompt('', json.dumps(data)))
+
     def test_connected_integer_dimensions_are_range_checked(self):
         for width, height in [(0, 1024), (1024, -16), (4112, 1024), (1024, 8192)]:
             with self.subTest(width=width, height=height), self.assertRaisesRegex(ValueError, '64到4096'):

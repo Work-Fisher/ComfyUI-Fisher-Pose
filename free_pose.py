@@ -15,6 +15,8 @@ from .pose_reference import reference_image
 VNCCS_INSTRUCTION = "Draw character from image2"
 SINGLE_PERSON_INSTRUCTION = (f"{VNCCS_INSTRUCTION}. Repose the person in image2 to match image1. "
                              "Preserve their appearance and the scene.")
+SKELETON_GUIDE_INSTRUCTION = ("The colored skeleton lines and joint markers in image1 "
+                              "are pose guides only; omit them from the finished image.")
 
 
 def people_sides(pose_json):
@@ -55,7 +57,10 @@ def instruction(pose_json=None, reference_mode=None):
 
 
 def free_pose_prompt(extra="", pose_json=None, reference_mode=None):
-    lines = [instruction(pose_json, reference_mode)] + [line.strip() for line in str(extra or "").splitlines()]
+    lines = [instruction(pose_json, reference_mode)]
+    if json.loads(pose_json or '{}').get('outputSkeleton') is True:
+        lines.append(SKELETON_GUIDE_INSTRUCTION)
+    lines += [line.strip() for line in str(extra or "").splitlines()]
     return "\n".join(line for line in lines if line)
 
 

@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict';
+import { frontFraming, outputShot } from '../web/editor/framing.mjs';
+const crop = { zoom: 2, offsetX: .2, offsetY: 3 };
+const doc = { framing: crop, anyAngle: { ...crop, yaw: 0, pitch: 0 } };
+assert.deepEqual(outputShot(doc, false), { ...crop, yaw: 0, pitch: 0 });
+assert.deepEqual(frontFraming({ autoFit: false, anyAngle: doc.anyAngle }), crop);
+doc.anyAngle = { ...crop, yaw: 45, pitch: 15 };
+assert.equal(outputShot(doc, true), doc.anyAngle);
+assert.equal(outputShot(doc, false).yaw, 0);
+assert.deepEqual(frontFraming(doc), crop);
+assert.deepEqual(frontFraming({ anyAngle: doc.anyAngle, autoFit: false }), { zoom: 1, offsetX: 0, offsetY: 0 });
+console.log('framing: front crop, camera switch and saved state passed');

@@ -1,9 +1,10 @@
 import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
 import { keepIfSame as keepIfUnchanged } from "./apply_state.mjs";
-import { scalarInput, cameraEnabled } from "./workflow_controls.mjs";
+import { scalarInput, cameraEnabled, setScalarInput } from "./workflow_controls.mjs?v=20261010-feedback2";
 import { verifyBindingRuntime } from "./binding_runtime.mjs";
 import { photoSlots, reconcilePortraits, routePortraitInputs } from "./portrait_inputs.mjs";
+import { repairPoseLinks, validateFisherLinks } from "./pose_links.mjs?v=20261010-feedback2";
 import { comfyLocale, followComfyLocale, translate } from "./i18n.mjs";
 
 const t = text => translate(text, comfyLocale(app));
@@ -26,7 +27,7 @@ function refreshLanguage() {
 const EDITORS = {
     studio: { url: new URL("./editor/studio.html", import.meta.url), version: "20260922-preview2", title: "Fisher 机位与姿态编辑器",
               fields: ["scene_json", "output_mode", "width", "height", "extra_prompt"], data: "scene_json", image: "reference_image_1" },
-    freePose: { url: new URL("./editor/freepose.html", import.meta.url), version: "20261008-pose-keypoints", title: "Fisher 姿势与镜头",
+    freePose: { url: new URL("./editor/freepose.html", import.meta.url), version: "20261010-feedback2", title: "Fisher 姿势与镜头",
                 fields: ["pose_json", "extra_prompt"], data: "pose_json", image: "reference_image" },
 };
 const FREE_POSE_NODES = ["FisherQwenFreePose", "FisherPoseImage"];
@@ -48,18 +49,18 @@ function styleWorkflowControl(node) {
     if (role === "width" || role === "height") control.options = { ...control.options, min: 64, max: 4096, step: 160 };
 }
 
-// Prefer the actual upstream image preview, falling back to LoadImage's file name.
+// LoadImage's selected file is authoritative; its last preview can still show the previous photo.
 function upstreamPreview(node,inputName){
     const input=node.inputs?.find(i=>i.name===inputName);
     let link=input?.link,seen=new Set();
     for(let depth=0;link!=null&&depth<12;depth++){
         const edge=(node.graph || app.graph).links[link];if(!edge)return null;
         const source=(node.graph || app.graph).getNodeById(edge.origin_id);if(!source||seen.has(source.id))return null;seen.add(source.id);
-        const preview=source.imgs?.[source.imageIndex||0]?.src;if(preview)return preview;
         if(source.comfyClass==='LoadImage'||source.type==='LoadImage'){
             const file=source.widgets?.find(w=>w.name==='image')?.value;
-            if(typeof file==='string'&&file){const cleaned=file.replace(/ \[(input|output|temp)\]$/,'');const slash=cleaned.lastIndexOf('/');return new URL('/view?'+new URLSearchParams({filename:cleaned.slice(slash+1),subfolder:slash>=0?cleaned.slice(0,slash):'',type:'input'}),location.origin).href;}
+            if(typeof file==='string'&&file){const type=file.match(/ \[(input|output|temp)\]$/)?.[1]||'input';const cleaned=file.replace(/ \[(input|output|temp)\]$/,'');const slash=cleaned.lastIndexOf('/');return new URL('/view?'+new URLSearchParams({filename:cleaned.slice(slash+1),subfolder:slash>=0?cleaned.slice(0,slash):'',type}),location.origin).href;}
         }
+        const preview=source.imgs?.[source.imageIndex||0]?.src;if(preview)return preview;
         link=source.inputs?.find(i=>i.type==='IMAGE'&&i.link!=null)?.link;
     }
     return null;
@@ -328,6 +329,11 @@ async function openEditor(node, { autoApply = false, inputSlots = null } = {}) {
             applying = true;
             try {
                 const shotNode = editor === EDITORS.freePose ? shotNodeFor(node) : null;
+                if (shotNode && typeof payload.cameraEnabled === 'boolean' && payload.cameraEnabled !== cameraEnabled(shotNode)) {
+                    if (!setScalarInput(shotNode, 'enable_camera', payload.cameraEnabled)) {
+                        throw Error('镜头开关由其他节点计算，请先在工作流中切换，再重新打开编辑器。');
+                    }
+                }
                 const before = { pose: widget(node, editor.data).value, shot: shotNode ? widget(shotNode, "shot_json")?.value : null };
                 let shotData = null;
                 if (editor === EDITORS.freePose) {
@@ -395,6 +401,7 @@ app.registerExtension({
         serializeGraph = graphToPrompt;
         app.graphToPrompt = async function (...args) {
             // Also cover programmatic widget changes and workflows loaded before this extension.
+            repairPoseLinks(app.graph);
             syncCameraBranches();
             let result = await graphToPrompt.apply(this, args);
             for (const node of app.graph._nodes) {
@@ -411,6 +418,15 @@ app.registerExtension({
             // Capture both API inputs and saved workflow metadata after reconciliation.
             result = await graphToPrompt.apply(this, args);
             for (const value of Object.values(result.output)) if (value.class_type === 'FisherQwenFreePose') routePortraitInputs(value.inputs);
+            const types = [...new Set(Object.values(result.output).map(n => n.class_type).filter(type => type.startsWith('Fisher')))];
+            if (types.length) {
+                const schemas = Object.assign({}, ...await Promise.all(types.map(async type => {
+                    const response = await api.fetchApi(`/object_info/${type}`, { cache: 'no-store' });
+                    if (!response.ok) throw Error('无法读取 Fisher 节点信息，请检查 ComfyUI 服务。');
+                    return response.json();
+                })));
+                validateFisherLinks(result.output, schemas);
+            }
             await verifyBindingRuntime(result.output, async () => {
                 const response = await api.fetchApi("/fisher_pose/env", { cache: "no-store" });
                 if (!response.ok) throw new Error("Backend unavailable");
@@ -420,6 +436,7 @@ app.registerExtension({
         };
     },
     afterConfigureGraph() {
+        repairPoseLinks(app.graph);
         for (const node of app.graph._nodes) styleWorkflowControl(node);
         syncCameraBranches();
     },

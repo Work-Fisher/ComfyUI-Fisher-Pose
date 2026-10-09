@@ -84,6 +84,13 @@ const base = process.env.FISHER_TEST_BASE || 'http://127.0.0.1:8765';
   await page.waitForFunction(()=>document.querySelector('#cancel-editor').textContent==='Cancel');
   if(name==='freepose')await page.waitForFunction(()=>window.freePose?.viewer?.skinnedMesh && document.querySelector('#loading').hidden,null,{timeout:90000});
   else await page.waitForTimeout(2000);
+  if(name==='freepose') {
+   assert.equal(await page.locator('#camera-switch-wrap .fp-toggle').textContent(),'Generate Camera View');
+   assert.equal(await page.locator('#auto-fit').locator('..').textContent(),'Auto Fit Full Body');
+   assert.match(await page.locator('#tz').locator('..').locator('.slider-label').last().textContent(),/^Depth \(Far ← → Near\)/);
+   await page.evaluate(()=>{document.querySelector('#detection-status').textContent='识别完成：可应用 6 段肢体。未识别的部位保持人偶现有姿势。'});
+   await page.waitForFunction(()=>document.querySelector('#detection-status').textContent.startsWith('Detection complete: 6'));
+  }
   const before=await page.evaluate(()=>({state:JSON.stringify(window.freePose?.doc || window.poseStudio?.snapshot()),description:document.querySelector('#description').textContent, values:[...document.querySelectorAll('select')].map(s=>[s.id,s.value,[...s.options].map(o=>o.value)])}));
   const uncovered=await page.evaluate(()=>{
    const walk=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT);const out=[];
@@ -94,6 +101,10 @@ const base = process.env.FISHER_TEST_BASE || 'http://127.0.0.1:8765';
   if(process.env.FISHER_SCREENSHOT_DIR) await page.screenshot({path:`${process.env.FISHER_SCREENSHOT_DIR}/fisher-${name}-en.png`,fullPage:true});
   await page.evaluate(()=>window.postMessage({type:'fisher-language',locale:'zh'},location.origin));
   await page.waitForFunction(()=>document.querySelector('#cancel-editor').textContent==='取消');
+  if(name==='freepose') {
+   assert.equal(await page.locator('#camera-switch-wrap .fp-toggle').textContent(),'换镜头生成');
+   assert.equal(await page.locator('#detection-status').textContent(),'识别完成：可应用 6 段肢体。未识别的部位保持人偶现有姿势。');
+  }
   await page.evaluate(()=>window.postMessage({type:'fisher-language',locale:'en'},location.origin));
   await page.waitForFunction(()=>document.querySelector('#cancel-editor').textContent==='Cancel');
   const after=await page.evaluate(()=>({state:JSON.stringify(window.freePose?.doc || window.poseStudio?.snapshot()),description:document.querySelector('#description').textContent, values:[...document.querySelectorAll('select')].map(s=>[s.id,s.value,[...s.options].map(o=>o.value)])}));

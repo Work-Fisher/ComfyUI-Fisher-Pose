@@ -1,0 +1,17 @@
+import assert from 'node:assert/strict';
+import { repairPoseLinks, validateFisherLinks } from '../web/pose_links.mjs';
+const source = { id: 1, type: 'FisherPoseImage', outputs: [{ type: 'IMAGE' }, { type: 'STRING' }, { type: 'STRING', links: [] }] };
+const target = { id: 2, type: 'FisherShot', inputs: [{ name: 'pose_json', link: 8 }] };
+const link = { id: 8, origin_id: 1, origin_slot: 5 };
+const graph = { _nodes: [source, target], links: { 8: link }, getNodeById: id => id === 1 ? source : null };
+const prompt = { 1: { class_type: 'FisherPoseImage', inputs: {} }, 2: { class_type: 'FisherShot', inputs: { pose_json: ['1', 5] } } };
+const schemas = { FisherPoseImage: { output: ['IMAGE', 'STRING', 'STRING'] } };
+assert.throws(() => validateFisherLinks(prompt, schemas), /不存在的输出/);
+assert.equal(repairPoseLinks(graph), 1);
+assert.equal(link.origin_slot, 2);
+assert.deepEqual(source.outputs[2].links, [8]);
+prompt[2].inputs.pose_json[1] = link.origin_slot;
+validateFisherLinks(prompt, schemas);
+assert.equal(repairPoseLinks(graph), 0);
+assert.throws(() => validateFisherLinks(prompt, {}), /重启/);
+console.log('pose links: stale slots repaired, stale backend rejected');

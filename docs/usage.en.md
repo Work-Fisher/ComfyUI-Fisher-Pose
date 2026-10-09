@@ -2,6 +2,8 @@
 
 [中文原文](usage.md) · [Home](../README.en.md) · [Installation and models](installation.en.md)
 
+See the [feedback fix validation record (Chinese)](feedback-validation.md) for the latest framing, skeleton application, and camera-switch checks.
+
 ## Modes
 
 | Mode | Node | Purpose |
@@ -24,7 +26,8 @@ Interface translation preserves prompts, internal option values, filenames, save
 - **Pose reference photos**: Upload Pose Reference, click Detect Skeleton, check the original-photo overlay, then Apply to Current Mannequin or Person 1/2. Raw DWPose coordinates are preserved even for cached detections. The motion reference does not replace workflow character photos. Photo detection requires [comfyui_controlnet_aux](https://github.com/Fannovel16/comfyui_controlnet_aux).
 - **Match Photo**: preserves 2D limb directions while adapting to mannequin bone lengths. Switch Depth Correction to Estimate Depth for front/back relationships. The mode is saved with the pose; neither mode uniquely recovers 3D motion from one image.
 - **OpenPose imports**: click a colored skeleton to pose the mannequin. Depth is inferred from apparent bone shortening; manually flip torso or limb segments when the estimate is wrong.
-- **Auto Fit**: enabled by default. Automatically frames people with a margin as poses or shot angles change. Manual camera zoom or pan disables it; enable it again at any time. Its state is saved with the pose.
+- **Auto Fit Full Body**: enabled by default. Automatically frames people with a margin as poses or shot angles change. For half-body shots or close-ups, zoom or pan the front camera to disable full-body fitting. This framing goes directly into the first-stage pose reference, including when multi-angle is off. Changing poses or reopening preserves manual framing; Fit Now restores full-body framing.
+- **Two-person depth**: use Depth under Person Position & Orientation to move the selected person closer or farther away. Each person's position is saved independently and retained when switching people or reopening. It affects perspective and occlusion in the mannequin reference; the final image still depends on the model.
 - **Pose / Camera**: inspecting in Pose mode preserves the shot camera. Camera mode uses dragging for direction, scrolling for distance, and right-dragging for composition. The preview shows the final shot. The internal VNCCS pose reference remains front-facing; camera changes use the separate AnyAngle branch.
 - **Hands and proportions**: Open, Flat, and Fist presets plus grip sliders. Adjust head, neck, shoulders, torso, upper arms, forearms, thighs, and lower legs independently while preserving the pose.
 - **Independent dimensions**: set reference size in the editor. The workflow's width/height integer controls set generated image size: 64–4096, multiples of 16. The editor reads these controls to show final dimensions.
@@ -59,7 +62,7 @@ The multi-angle switch above the workflow starts off:
 - **Off · Pose Only**: generate the front pose without reconstruction or AnyAngle. Saved camera settings are retained.
 - **On · Full Workflow**: use the saved shot camera, reconstruct the subject, and save the AnyAngle result. Front shots skip unnecessary camera processing.
 
-The switch and dimension controls use built-in ComfyUI nodes. With Auto Fit enabled, automatically fitted zoom and framing do not count as a camera change; manual zoom or pan after disabling it does. Reset to Front resets the shot and skips the camera branch.
+The editor's Camera panel also has Generate Camera View, synchronized with the workflow's multi-angle switch. When off, the preview shows the actual front framing while retaining the rotated camera for later use. The switch and dimension controls use built-in ComfyUI nodes. Front-view zoom and pan directly affect the pose reference without activating the camera branch; yaw or pitch rotation requires multi-angle. Reset to Front resets both the camera and close-up framing.
 
 The workflow has seven colored processing areas. Loaders are on the left; character inputs, pose/camera, front generation, and final output run across the upper row. Reconstruction and camera generation are below and normally require no manual changes. They are muted for front-only generation, while remaining expanded. Native reroutes organize long connections.
 
@@ -86,6 +89,9 @@ If an angle disagrees with the preview, compare the front result and coarse came
 | Large camera turns remain near-front, or original reconstruction camera is missing | Update plugin and workflow, restart ComfyUI, and connect the TripoSplat sampler's `latent` to `camera_latent`. New calibration uses each reconstruction's predicted camera; no new models are needed. |
 | VAE loading fails, `lora key not loaded` appears, or output matches the input photo | Check full logs for incompatible core/model/LoRA versions. Qwen Image 2.1 support is required. Portable installations use `update/update_comfyui.bat`; Git installations use `git pull`. Core must be 0.36.0 or newer. |
 | Editor fails with a missing MakeHuman asset / HTTP 404 | Download the complete plugin again from GitHub. Check for `web/vnccs/assets/pose_studio_makehuman.v2.bin` (about 86 MB). |
+| Body data exists but loading is interrupted | Check whether IDM, a proxy, or another download manager intercepted the local resource request. The plugin now uses an extension-free body-data route and distinguishes missing files, interrupted requests, and parsing failures. Restart the backend after updating; older servers fall back to the static file. |
+| Skeleton detection reaches 100% but Apply does nothing | Check the status beside the detection button. Cropped photos now apply only valid limb segments, preserving undetected parts. A skeleton with no valid segments produces a specific error. Detection progress does not guarantee complete keypoints; provide the original photo and logs for other failures. |
+| `pose_json` validation reports `tuple index out of range` | One reproduced cause is a saved link pointing to a nonexistent output slot. The plugin repairs known Fisher pose-data links and checks them against current backend schemas before queueing. If it persists, provide the workflow and full logs; the exception alone does not identify the cause. |
 | Mannequin image file is missing | Captures live in `input/fisher_pose/` and may be lost when moving computers or clearing inputs. Open the editor and Apply Only to rebuild it. |
 | Extra arms or legs | Match mannequin and photo aspect ratios, use Fit to fill the frame, and use a full-body photo rather than only a headshot. |
 | People swap after a pose change | Update the plugin, restart ComfyUI, and refresh. Check Person Mapping and the front result first: the camera stage inherits it. Group-photo mapping still depends on the model's prompt following. |
@@ -96,5 +102,6 @@ If an angle disagrees with the preview, compare the front result and coarse came
 ## Known limitations
 
 - Free Pose supports two people. Two-person pose matching is less stable than single-person matching. Broad gestures such as raising a hand or extending an arm work more reliably than subtle gestures such as hands on hips. Multi-person OpenPose images use the largest person.
-- A 2D skeleton does not uniquely determine depth. Match Photo preserves visible motion direction rather than real depth. Occlusion, side views, and clothing can hide joints, and illustrated body proportions may differ. Inspect the overlay before applying. Head direction, fingers, and foot orientation are not extracted. Missing necessary joints produce an error rather than guessing and applying a complete body.
+- A 2D skeleton does not uniquely determine depth. Match Photo preserves visible motion direction rather than real depth. Occlusion, side views, and clothing can hide joints, and illustrated body proportions may differ. Inspect the overlay before applying. Head direction, fingers, and foot orientation are not extracted. With partial keypoints, only visible limbs are applied and other parts retain their current pose; Estimate Depth is disabled for these partial detections.
+- Skeleton references are visual model inputs. The prompt tells the model to use colored lines and joint markers only as pose guides. A same-seed comparison removed skeleton lines, but some styles or poses may still copy them. Complex two-person extra limbs, identity changes, and proportion drift still require checking each stage; a successful run does not guarantee a correct image.
 - Mannequin images provide pose guidance. If output and reference aspect ratios differ greatly, the model determines character placement.

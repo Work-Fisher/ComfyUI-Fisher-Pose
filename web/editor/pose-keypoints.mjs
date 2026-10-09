@@ -34,6 +34,20 @@ export function requireBody(points) {
     return points;
 }
 
+export const BODY_SEGMENTS = [
+    ['ls', 'le', 'upperarm_l', 'lowerarm_l'], ['le', 'lw', 'lowerarm_l', 'hand_l'],
+    ['rs', 're', 'upperarm_r', 'lowerarm_r'], ['re', 'rw', 'lowerarm_r', 'hand_r'],
+    ['lh', 'lk', 'thigh_l', 'calf_l'], ['lk', 'la', 'calf_l', 'foot_l'],
+    ['rh', 'rk', 'thigh_r', 'calf_r'], ['rk', 'ra', 'calf_r', 'foot_r'],
+];
+
+export function applicableBody(points) {
+    const segments = BODY_SEGMENTS.filter(([a, b]) => points?.[a] && points?.[b]
+        && Math.hypot(points[b][0] - points[a][0], points[b][1] - points[a][1]) > 1e-3);
+    if (!segments.length) throw Error('未检测到可用的手臂或腿部，请换一张能看清肢体的参考图');
+    return { segments, complete: ORDER.every(key => points[key]) };
+}
+
 export function poseOverlay(photo, detection) {
     const canvas = document.createElement('canvas');
     const scale = Math.min(1, 1200 / Math.max(detection.width, detection.height));

@@ -31,6 +31,25 @@ test('all translation templates retain their parameter slots', () => {
     }
 });
 
+test('upstream camera, partial-pose, asset and link messages translate without changing details', () => {
+    const messages = new Map([
+        ['换镜头生成', 'Generate Camera View'],
+        ['自动全身入框', 'Auto Fit Full Body'],
+        ['识别完成：可应用 6 段肢体。未识别的部位保持人偶现有姿势。', 'Detection complete: 6 limb segments can be applied. Undetected parts retain their current mannequin pose.'],
+        ['已应用到人物 2。', 'Applied to Person 2.'],
+        ['已应用到人物 2。图中有 3 人，已取最大的一个。', 'Applied to Person 2; selected the largest of 3 people.'],
+        ['已应用 6 段可见肢体；未识别部位保持原姿势。', 'Applied 6 visible limb segments; undetected parts retain their previous pose.'],
+        ['已应用 6 段可见肢体；未识别部位保持原姿势。图中有 3 人，已取最大的一个。', 'Applied 6 visible limb segments; selected the largest of 3 people. Undetected parts retain their previous pose.'],
+        ['已应用可见肢体。图中有 3 人，已取最大的一个。未识别的部位保持原姿势，手势需单独调整。', 'Visible limbs applied; selected the largest of 3 people. Undetected parts retain their previous pose; adjust hands separately.'],
+        ['人体数据请求失败：HTTP 500。请检查 ComfyUI 服务或代理是否拦截。', 'Body data request failed: HTTP 500. Check the ComfyUI service and whether a proxy intercepted the request.'],
+        ['节点 7 的 pose_json 连到了 FisherPoseImage 不存在的输出 5。请保存工作流并重启 ComfyUI；仍有问题时重新连接「姿势数据」输出，或导入最新版工作流。', 'Node 7 input pose_json is connected to nonexistent output 5 of FisherPoseImage. Save the workflow and restart ComfyUI. If the problem persists, reconnect the Pose Data output or import the latest workflow.'],
+    ]);
+    for (const [source, english] of messages) {
+        assert.equal(translate(source, 'en'), english);
+        assert.equal(translate(source, 'zh'), source);
+    }
+});
+
 test('follow Comfy.Locale on initial load, settings events, and store-only updates', context => {
     context.mock.timers.enable({ apis: ['setInterval'] });
     let locale = 'en';
