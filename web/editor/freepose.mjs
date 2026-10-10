@@ -768,8 +768,8 @@ function refreshPosePhoto() {
     $('#use-person-photo').hidden = !personPreviewUrls[doc.active ?? 0] || Boolean(doc.people && doc.referenceMode === 'group');
     const sdpose = $('#pose-detector').value === 'sdpose';
     $('#sdpose-options').hidden = !sdpose;
-    $('#pose-detector-hint').textContent = sdpose ? (detectionOptions.sdpose ? 'SDPose 当前按单人识别；合照分人请用 DWPose。不会替换人物照片。' : '未找到 SDPose 节点或权重。下载 checkpoint 放入 models/checkpoints，更新核心后重新检查。')
-        : dwposeReady ? '仅提取动作，不替换工作流中的人物照片。' : '识别需要 DWPose（comfyui_controlnet_aux）；预设和骨架导入仍可使用。';
+    $('#pose-detector-hint').textContent = sdpose ? (detectionOptions.sdpose ? '单人姿势推荐尝试 SDPose。识别后叠加原图检查，细节可用「修正骨架」调整；多人合照请用 DWPose。' : '未找到 SDPose 节点或权重。下载 checkpoint 放入 models/checkpoints，更新核心后重新检查。')
+        : dwposeReady ? 'DWPose 识别不够贴合？单人图推荐尝试 SDPose；多人合照继续使用 DWPose。仅提取动作，不替换人物照片。' : '识别需要 DWPose（comfyui_controlnet_aux）；预设和骨架导入仍可使用。';
 }
 const detectorReady = () => $('#pose-detector').value === 'sdpose' ? detectionOptions.sdpose : dwposeReady;
 async function refreshDetectors() {
