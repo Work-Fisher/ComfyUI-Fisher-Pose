@@ -1,5 +1,10 @@
 import { loadBodyPack } from './body-pack.mjs?v=20261010-feedback2';
 import { createMovementGizmo } from './movement-gizmo.mjs?v=20261010-xyz1';
+import { detectorOptions, detectionPrompt } from './pose-detector.mjs';
+import { editKeypoints } from './keypoint-editor.mjs';
+import { createBodyPresets, estimateProportions } from './body-presets.mjs';
+import { restorePoseShape, omitPoseShape } from './pose-shape.mjs';
+import { createReferenceOverlay } from './reference-overlay.mjs';
 // Free-pose editor: one VNCCS MakeHuman mannequin. Editing uses a free orbit view;
 // the output is always the VNCCS front capture (yaw 0 / pitch 0, white background,
 // flat white ambient light), which is what the VNCCS_QI2_PoseStudio LoRA was trained on.
@@ -47,6 +52,8 @@ let studio = { camera: false, canGenerate: false, canOpenWorkflow: false };
 let editMode = 'pose';
 let poseTool = 'joints';
 let movementGizmo = null;
+let referenceOverlay = null, overlayFileURL = null, bodyPresets = null;
+let detectionOptions = { dwpose: false, sdpose: false, checkpoints: [] };
 let previewRevision = 0;
 let autoFitTimer = null;
 let fitting = false;
@@ -101,10 +108,13 @@ const viewer = new PoseViewerCore(canvas, {
     showCaptureFrame: true,
     syncMode: 'end',
     useHandControlPopover: false,
-    captureHistoryContext: () => ({ transform: { ...doc.transform } }),
+    captureHistoryContext: () => ({ transform: { ...doc.transform }, mesh: { ...doc.mesh }, proportions: { ...doc.proportions } }),
     onHistoryRestore: pose => {
         if (pose.editorState) {
             doc.transform = { ...pose.editorState.transform };
+            if (pose.editorState.mesh && (JSON.stringify(doc.mesh) !== JSON.stringify(pose.editorState.mesh) || JSON.stringify(doc.proportions) !== JSON.stringify(pose.editorState.proportions))) {
+                doc.mesh = { ...pose.editorState.mesh }; doc.proportions = { ...pose.editorState.proportions }; loadModel(pose);
+            }
             viewer.setActiveCharacterAppearance({ transform: doc.transform });
             updateCamera(false);
         }
@@ -188,6 +198,7 @@ function shotArgs(width = studio.outputWidth || doc.width, height = studio.outpu
 function updateCamera(snap) {
     if (snap) viewer.snapToCaptureCamera(...shotArgs());
     else viewer.updateCaptureCamera(...shotArgs());
+    referenceOverlay?.sync();
     refreshControls();
     schedulePreview();
 }
@@ -290,7 +301,7 @@ function schedulePreview() {
             const shot = viewer.capture(args[0], args[1], args[2], CAPTURE_BACKGROUND, ...args.slice(3), doc.outputSkeleton);
             if (shot) { $('#inset-preview').src = shot; $('#angle-preview').src = shot; }
         } catch (error) { toast('预览未完成：' + error.message); }
-        finally { viewer.updateCaptureCamera(...shotArgs()); }
+        finally { viewer.updateCaptureCamera(...shotArgs()); referenceOverlay?.sync(); }
     }, 180);
 }
 
@@ -397,23 +408,11 @@ function poseFromSkeleton(image, key, label) {
 // 从人物图识别姿势: DWPose (comfyui_controlnet_aux) runs on the person photo through ComfyUI's own
 // queue. Apply original POSE_KEYPOINT coordinates, never re-detect them from the rendered PNG.
 // Body only; hands and face are left to the hand presets.
-const DWPOSE_MODELS = { bbox_detector: 'yolox_l.torchscript.pt', pose_estimator: 'dw-ll_ucoco_384_bs5.torchscript.pt' };
-
-async function dwposeAvailable() {
-    try {
-        const response = await fetch('/object_info/DWPreprocessor', { cache: 'no-store' });
-        return response.ok && Boolean((await response.json()).DWPreprocessor);
-    } catch { return false; }
-}
-
-function pickOption(options, preferred) {
-    return options?.includes(preferred) ? preferred : options?.find(option => option !== 'None') ?? preferred;
-}
-
 async function detectPersonPose() {
     const status = $('#detection-status');
     const button = $('#detect-person');
-    if (!posePhoto || detectingPose || !dwposeReady) return;
+    if (!posePhoto || detectingPose || !detectorReady()) return false;
+    const method = $('#pose-detector').value;
     const source = { ...posePhoto };
     detectedPose = null;
     $('#detected-pose').hidden = true;
@@ -436,14 +435,8 @@ async function detectPersonPose() {
         form.append('subfolder', 'fisher_pose');
         form.append('type', 'input');
         const upload = await (await fetch('/upload/image', { method: 'POST', body: form })).json();
-        const info = (await (await fetch('/object_info/DWPreprocessor')).json()).DWPreprocessor.input.optional;
-        const prompt = {
-            1: { class_type: 'LoadImage', inputs: { image: `${upload.subfolder ? upload.subfolder + '/' : ''}${upload.name}` } },
-            2: { class_type: 'DWPreprocessor', inputs: { image: ['1', 0], detect_hand: 'disable', detect_body: 'enable', detect_face: 'disable', resolution: 1024,
-                bbox_detector: pickOption(info.bbox_detector?.[0], DWPOSE_MODELS.bbox_detector), pose_estimator: pickOption(info.pose_estimator?.[0], DWPOSE_MODELS.pose_estimator) } },
-            3: { class_type: 'PreviewImage', inputs: { images: ['2', 0] } },
-            4: { class_type: 'PreviewAny', inputs: { source: ['2', 1] } },
-        };
+        if (!upload.name) throw Error(upload.error || '参考图片上传失败');
+        const prompt = detectionPrompt(method, `${upload.subfolder ? upload.subfolder + '/' : ''}${upload.name}`, detectionOptions, $('#sdpose-checkpoint').value);
         const queued = await (await fetch('/prompt', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt }) })).json();
         if (!queued.prompt_id) throw new Error(queued.error?.message || 'ComfyUI 没有接受识别任务');
         status.textContent = '正在识别姿势（ComfyUI 队列里有别的任务时会等它跑完）…';
@@ -453,7 +446,8 @@ async function detectPersonPose() {
             result = (await (await fetch(`/history/${queued.prompt_id}`, { cache: 'no-store' })).json())[queued.prompt_id];
         }
         if (!result) throw new Error('等待超时');
-        if (result.status?.status_str === 'error') throw new Error('DWPose 运行出错，请看 ComfyUI 控制台');
+        if (!ready) return false;
+        if (result.status?.status_str === 'error') throw new Error(`${method === 'sdpose' ? 'SDPose' : 'DWPose'} 运行出错，请看 ComfyUI 控制台`);
         const output = result.outputs?.['3']?.images?.[0];
         if (!output) throw new Error('没有得到骨架图');
         const image = new Image();
@@ -466,6 +460,9 @@ async function detectPersonPose() {
         const body = applicableBody(largestBody(detection.people));
         const photo = new Image(); photo.src = source.url; await photo.decode();
         detectedPose = { image, name: source.name, ...detection, overlay: poseOverlay(photo, detection) };
+        detectedPose.photo = photo;
+        detectedPose.selected = detection.people.indexOf(largestBody(detection.people));
+        refreshDetectedPeople();
         $('#pose-preview-overlay').checked = true;
         $('#detected-pose-preview').src = detectedPose.overlay;
         $('#download-detected-pose').href = image.src;
@@ -473,9 +470,11 @@ async function detectPersonPose() {
         status.textContent = body.complete ? '识别完成，请点击下方「应用」。手指需单独调整。'
             : `识别完成：可应用 ${body.segments.length} 段肢体。未识别的部位保持人偶现有姿势。`;
         $('#apply-detected-pose').disabled = false;
+        return true;
     } catch (error) {
         status.textContent = `识别失败：${error.message}`;
     } finally { detectingPose = false; refreshPosePhoto(); }
+    return false;
 }
 
 async function importEntry(entry) {
@@ -710,6 +709,8 @@ async function saveCurrentPose(presetName) {
         doc: { ...doc, pose: savedPose(), people: doc.people ? peopleNow() : undefined, active: undefined },
         grips: gripsNow(),
     };
+    record.includeShape = $('#save-pose-shape').checked;
+    if (!record.includeShape) record.doc = omitPoseShape(record.doc);
     try {
         let response = await postPose(name, record, false);
         if (response.status === 409) {
@@ -730,7 +731,7 @@ async function loadSavedPose(entry) {
         if (!response.ok) { toast('这个姿势已经不存在了'); await loadSavedList(); return; }
         const record = await response.json();
         viewer.recordState();
-        doc = docFrom(record.doc);
+        doc = docFrom(restorePoseShape(record, doc.people ? peopleNow() : [doc]));
         loadModel(doc.pose);
         setGrips(record.doc.people?.[0]?.grips || record.grips);
         rebuildPassives();
@@ -757,14 +758,29 @@ async function deleteSavedPose(entry, skipConfirm = false) {
 $('#save-pose').onclick = () => saveCurrentPose();
 let detectedPose = null;
 function refreshPosePhoto() {
-    $('#detect-person').disabled = !posePhoto || !dwposeReady || detectingPose;
+    $('#detect-person').disabled = !posePhoto || !detectorReady() || detectingPose;
+    $('#detect-and-apply').disabled = $('#detect-person').disabled;
+    $('#pose-detector').disabled = $('#sdpose-checkpoint').disabled = detectingPose;
     $('#detect-person').textContent = detectingPose ? '正在识别骨骼…' : posePhoto ? '识别骨骼图' : '先选择姿势参考图';
     $('#apply-detected-pose').textContent = doc.people ? `应用到人物 ${(doc.active ?? 0) + 1}` : '应用到当前人偶';
     $('#choose-pose-photo').disabled = detectingPose;
     $('#use-person-photo').disabled = detectingPose;
     $('#use-person-photo').hidden = !personPreviewUrls[doc.active ?? 0] || Boolean(doc.people && doc.referenceMode === 'group');
-    $('#pose-detector-hint').textContent = dwposeReady ? '仅提取动作，不替换工作流中的人物照片。' : '识别需要 DWPose（comfyui_controlnet_aux）；预设和骨架导入仍可使用。';
+    const sdpose = $('#pose-detector').value === 'sdpose';
+    $('#sdpose-options').hidden = !sdpose;
+    $('#pose-detector-hint').textContent = sdpose ? (detectionOptions.sdpose ? 'SDPose 当前按单人识别；合照分人请用 DWPose。不会替换人物照片。' : '未找到 SDPose 节点或权重。下载 checkpoint 放入 models/checkpoints，更新核心后重新检查。')
+        : dwposeReady ? '仅提取动作，不替换工作流中的人物照片。' : '识别需要 DWPose（comfyui_controlnet_aux）；预设和骨架导入仍可使用。';
 }
+const detectorReady = () => $('#pose-detector').value === 'sdpose' ? detectionOptions.sdpose : dwposeReady;
+async function refreshDetectors() {
+    detectionOptions = await detectorOptions(); dwposeReady = detectionOptions.dwpose;
+    const previous = $('#sdpose-checkpoint').value;
+    $('#sdpose-checkpoint').replaceChildren(...detectionOptions.checkpoints.map(name => { const option = document.createElement('option'); option.value = option.textContent = name; return option; }));
+    if (detectionOptions.checkpoints.includes(previous)) $('#sdpose-checkpoint').value = previous;
+    refreshPosePhoto();
+}
+$('#pose-detector').onchange = refreshPosePhoto;
+$('#refresh-detectors').onclick = refreshDetectors;
 function selectPosePhoto(url, name, owned = false) {
     if (detectingPose) return;
     if (posePhoto?.owned) URL.revokeObjectURL(posePhoto.url);
@@ -777,6 +793,7 @@ function selectPosePhoto(url, name, owned = false) {
     $('#pose-photo-selection').hidden = false;
     $('#import-status').textContent = '已选择参考图，先识别骨骼，再应用到人偶。';
     refreshPosePhoto();
+    if ($('#overlay-source').value === 'pose') $('#overlay-source').dispatchEvent(new Event('change'));
 }
 const onPosePhotoFile = file => {
     if (file && (!file.type || file.type.startsWith('image/'))) selectPosePhoto(URL.createObjectURL(file), file.name, true);
@@ -789,23 +806,77 @@ $('#choose-pose-photo').onclick = () => {
 $('#pose-photo-file').onchange = event => onPosePhotoFile(event.target.files[0]);
 $('#use-person-photo').onclick = () => selectPosePhoto(personPreviewUrls[doc.active ?? 0], `已接人物图 ${(doc.active ?? 0) + 1}`);
 $('#detect-person').onclick = detectPersonPose;
+$('#detect-and-apply').onclick = async () => {
+    const target = doc.active ?? 0;
+    if (await detectPersonPose()) {
+        if ((doc.active ?? 0) !== target) { toast('识别完成，但当前人物已切换；请确认后手动应用。'); return; }
+        $('#apply-detected-pose').click();
+    }
+};
 $('#pose-preview-overlay').onchange = event => {
     if (detectedPose) $('#detected-pose-preview').src = event.target.checked ? detectedPose.overlay : detectedPose.image.src;
 };
 $('#apply-detected-pose').onclick = () => {
     if (!detectedPose) return;
     try {
-        const points = largestBody(detectedPose.people);
+        const points = detectedPose.people[detectedPose.selected ?? 0];
         const body = applicableBody(points);
         doc.openpose = { key: 'photo', name: detectedPose.name, points, flips: {}, depthMode: 'planar' };
         applyOpenPose();
-        const count = detectedPose.people.length > 1 ? `图中有 ${detectedPose.people.length} 人，已取最大的一个。` : '';
+        const count = detectedPose.people.length > 1 ? `使用参考图中的人物 ${(detectedPose.selected ?? 0) + 1}。` : '';
         $('#import-status').textContent = body.complete ? `已按原图关节点贴合动作。${count}当前保留二维方向；需要前后深度可在下方切换「估算立体」。手势需单独调整。`
             : `已应用可见肢体。${count}未识别的部位保持原姿势，手势需单独调整。`;
         $('#detection-status').textContent = body.complete ? `已应用到人物 ${(doc.active ?? 0) + 1}。${count}`
             : `已应用 ${body.segments.length} 段可见肢体；未识别部位保持原姿势。${count}`;
         toast($('#detection-status').textContent);
     } catch (error) { $('#detection-status').textContent = `应用失败：${error.message}`; toast($('#detection-status').textContent); }
+};
+
+function refreshDetectedPeople() {
+    const select = $('#detected-person');
+    select.replaceChildren(...detectedPose.people.map((_, index) => { const option = document.createElement('option'); option.value = index; option.textContent = `参考图人物 ${index + 1}`; return option; }));
+    select.value = detectedPose.selected ?? 0;
+    select.hidden = detectedPose.people.length < 2;
+}
+$('#detected-person').onchange = event => { if (detectedPose) detectedPose.selected = Number(event.target.value); };
+$('#edit-keypoints').onclick = async () => {
+    if (!detectedPose) return;
+    const corrected = await editKeypoints(detectedPose, detectedPose.photo?.src || posePhoto?.url, detectedPose.selected ?? 0);
+    if (!corrected) return;
+    Object.assign(detectedPose, corrected);
+    detectedPose.overlay = poseOverlay(detectedPose.photo, detectedPose);
+    const image = new Image(); image.src = poseOverlay(null, detectedPose); await image.decode(); detectedPose.image = image;
+    $('#download-detected-pose').href = image.src;
+    $('#detected-pose-preview').src = $('#pose-preview-overlay').checked ? detectedPose.overlay : image.src;
+    refreshDetectedPeople(); $('#detection-status').textContent = '骨架已修正，点击应用将动作交给当前人偶。';
+};
+$('#fit-detected-body').onclick = () => {
+    if (!detectedPose) return;
+    try {
+        const next = estimateProportions(detectedPose.people[detectedPose.selected ?? 0], restJoints().rest, doc.proportions, Object.fromEntries(PROPORTIONS.map(([key, , min, max]) => [key, [min, max]])));
+        applyBodyShape({ mesh: doc.mesh, proportions: next });
+        toast('已估算当前人物的骨长比例，可撤销；姿势需另点应用。');
+    } catch (error) { toast(error.message); }
+};
+
+function applyBodyShape(record) {
+    viewer.recordState();
+    const pose = rotationsOnly(savedPose());
+    doc.mesh = { ...DEFAULT_MESH, ...record.mesh }; doc.proportions = { ...DEFAULT_PROPORTIONS, ...record.proportions };
+    manualPlacement(); loadModel(pose); updateCamera(false); refreshControls();
+}
+$('#save-body').onclick = () => bodyPresets?.save();
+$('#overlay-source').onchange = async event => {
+    const source = event.target.value;
+    const url = source === 'pose' ? posePhoto?.url : source === 'person' ? personPreviewUrls[doc.referenceMode === 'group' ? 0 : doc.active ?? 0] : source === 'file' ? overlayFileURL : null;
+    try { if (source !== 'none' && !url) throw Error('请先选择对应的参考图片'); await referenceOverlay?.setSource(url); }
+    catch (error) { event.target.value = 'none'; await referenceOverlay?.setSource(null); toast(error.message); }
+};
+$('#overlay-opacity').oninput = event => referenceOverlay?.setOpacity(Number(event.target.value));
+$('#overlay-file').onchange = async event => {
+    const file = event.target.files[0]; if (!file) return;
+    if (overlayFileURL) URL.revokeObjectURL(overlayFileURL);
+    overlayFileURL = URL.createObjectURL(file); $('#overlay-source').value = 'file'; $('#overlay-source').dispatchEvent(new Event('change'));
 };
 
 // --- Two people -------------------------------------------------------------
@@ -869,6 +940,7 @@ function switchPerson(index) {
     forgetHistory();
     selectedBoneName = null;
     refreshPeople(); refreshFlips(); refreshControls(); updateCamera(false);
+    if ($('#overlay-source').value === 'person') $('#overlay-source').dispatchEvent(new Event('change'));
     $('#import-status').textContent = `正在编辑人物 ${index + 1}（使用人物 ${index + 1} 的照片）。`;
 }
 
@@ -1481,9 +1553,12 @@ async function start(payload) {
     if (!restored && personAspect) [doc.width, doc.height] = sizeForAspect(personAspect).map(round16);
     void checkEnvironment();
     personPreviewUrls = [payload?.referencePreview || null, payload?.referencePreview2 || null];
-    void dwposeAvailable().then(available => { dwposeReady = available; refreshPeople(); });
+    void refreshDetectors();
     loadModel(doc.pose);
     rebuildPassives();
+    referenceOverlay = createReferenceOverlay(viewer);
+    bodyPresets = createBodyPresets({ getPerson: () => doc, apply: applyBodyShape, toast, container: $('#body-presets'),
+        thumbnail: async () => { await viewer.waitForCaptureReady(); const scale = 128 / Math.max(doc.width, doc.height); const thumbnail = capture(Math.round(doc.width * scale), Math.round(doc.height * scale)); updateCamera(false); return thumbnail; } });
     movementGizmo = createMovementGizmo(viewer, {
         getTransform: () => doc.transform,
         onStart: manualPlacement,
@@ -1558,6 +1633,9 @@ function dispose() {
     previewRevision++;
     stageObserver.disconnect();
     movementGizmo?.dispose();
+    referenceOverlay?.dispose();
+    if (overlayFileURL) URL.revokeObjectURL(overlayFileURL);
+    if (posePhoto?.owned) URL.revokeObjectURL(posePhoto.url);
     viewer.renderer?.forceContextLoss();
     viewer.dispose();
     pack = null;

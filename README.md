@@ -10,6 +10,8 @@
 
 [安装与模型](docs/installation.md) · [使用指南](docs/usage.md)
 
+[新增姿势辅助工具](docs/pose-toolkit.md)：SDPose 可选识别 · 骨架微调 · 参考图对位 · 独立身材预设 · 生成历史对照
+
 </div>
 
 ## 演示

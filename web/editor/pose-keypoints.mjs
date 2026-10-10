@@ -54,7 +54,8 @@ export function poseOverlay(photo, detection) {
     canvas.width = Math.round(detection.width * scale);
     canvas.height = Math.round(detection.height * scale);
     const ctx = canvas.getContext('2d');
-    ctx.drawImage(photo, 0, 0, canvas.width, canvas.height);
+    if (photo) ctx.drawImage(photo, 0, 0, canvas.width, canvas.height);
+    else { ctx.fillStyle = '#000'; ctx.fillRect(0, 0, canvas.width, canvas.height); }
     ctx.lineWidth = Math.max(2, canvas.width / 220);
     ctx.lineCap = 'round';
     for (const points of detection.people) {

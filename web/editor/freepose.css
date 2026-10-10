@@ -139,3 +139,11 @@ button:focus-visible,summary:focus-visible{outline:2px solid #315acd;outline-off
 #movement-legend{display:flex;gap:14px;padding:8px 6px;font-size:11px;font-weight:600;text-shadow:0 1px 3px #000}
 #movement-legend[hidden],#movement-tools[hidden]{display:none}
 .axis-x{color:#ff7676}.axis-y{color:#80df8b}.axis-z{color:#82aaff}
+/* Optional editing aids share the editor's existing compact control language. */
+.fp-detector-row{display:flex;gap:6px;align-items:center;margin:8px 0}.fp-detector-row>*{min-width:0;flex:1}
+.fp-detector-row select,#sdpose-checkpoint,#detected-person,.fp-overlay-panel select{width:100%;padding:8px;border:1px solid #dce3ed;border-radius:8px;background:#fff;color:#334155;font:inherit;font-size:12px}
+#sdpose-options a{display:block;font-size:12px;margin:8px 0}#detected-person{margin-bottom:8px}
+.fp-shape-card{display:flex;gap:4px;margin:8px 0}.fp-shape-card>button:first-child{display:flex;align-items:center;gap:10px;flex:1;min-width:0;text-align:left}.fp-shape-card img{width:42px;height:52px;object-fit:contain;border-radius:4px}.fp-shape-card span{overflow:hidden;text-overflow:ellipsis}
+.fp-keypoint-dialog{width:min(1000px,94vw);height:90vh;max-height:94vh;padding:0;border:1px solid #dce3ed;border-radius:14px;background:#f5f7fb;color:#253249;box-shadow:0 20px 80px #0005}
+.fp-keypoint-dialog::backdrop{background:#14182799}.fp-keypoint-dialog header{display:flex;align-items:center;gap:10px;padding:14px 18px;background:#fff}.fp-keypoint-dialog header b{margin-right:auto}.fp-keypoint-dialog button,.fp-keypoint-dialog select{padding:7px 10px;font:inherit;font-size:13px;border:1px solid #dce3ed;border-radius:7px;background:#fff;color:#334155;cursor:pointer}.fp-keypoint-dialog .primary{background:#3157d5;color:white}
+.fp-keypoint-tools{display:flex;flex-wrap:wrap;gap:7px;align-items:center;padding:12px 18px}.fp-keypoint-dialog p{margin:0;padding:0 18px 10px;font-size:12px;color:#64748b}.fp-keypoint-canvas{height:calc(100% - 170px);min-height:200px;background:#151825;margin:0 18px 18px;border-radius:9px}.fp-keypoint-canvas svg{display:block;width:100%;height:100%}

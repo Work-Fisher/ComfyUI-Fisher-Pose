@@ -82,7 +82,9 @@ ZIP 安装请下载新版，备份旧插件文件夹后替换；不要让 `custo
 
 ### 照片识别姿势（可选）
 
-操作顺序是 **上传姿势参考图 → 识别骨骼图 → 检查原图叠加预览 → 应用到当前人偶**。双人时应用到当前选中的人偶；动作参考照片不会替换用于生图的人物照片。内置姿势和导入 OpenPose 骨架图不需要 DWPose。照片识别用 ComfyUI 核心的 `PreviewAny` 保留原始关节点（包括缓存结果），不需要额外插件。此次更新不需要重新下载检测模型，更新 Fisher Pose 后保存编辑并 Ctrl+F5 刷新即可。
+默认使用下方的 DWPose；新增 [SDPose](#sdpose可选) 可手动切换，不替代原有检测器。
+
+操作顺序是 **上传姿势参考图 → 识别骨骼图 → 检查原图叠加预览 → 应用到当前人偶**。双人时应用到当前选中的人偶；动作参考照片不会替换用于生图的人物照片。内置姿势和导入 OpenPose 骨架图不需要 DWPose。照片识别用 ComfyUI 核心的 `PreviewAny` 保留原始关节点（包括缓存结果），不需要额外插件。继续使用 DWPose 不需要重新下载检测模型，更新 Fisher Pose 后保存编辑并 Ctrl+F5 刷新即可。
 
 安装上表的 `comfyui_controlnet_aux` 后，首次点识别会由该插件下载检测权重。Fisher Pose 优先选择以下 TorchScript 文件；断网或自动下载失败时可以手动下载：
 
@@ -92,3 +94,17 @@ ZIP 安装请下载新版，备份旧插件文件夹后替换；不要让 `custo
 | `dw-ll_ucoco_384_bs5.torchscript.pt` | [下载](https://huggingface.co/hr16/DWPose-TorchScript-BatchSize5/resolve/main/dw-ll_ucoco_384_bs5.torchscript.pt?download=true) · [来源](https://huggingface.co/hr16/DWPose-TorchScript-BatchSize5) | `custom_nodes/comfyui_controlnet_aux/ckpts/hr16/DWPose-TorchScript-BatchSize5/` |
 
 若你改过 controlnet_aux 的 `annotator_ckpts_path`，请放到配置指定的目录，保留后面的作者/仓库子目录。不同版本可提供不同检测器选项，以控制台实际请求的文件为准；不要将这些检测权重放进 `models/loras`。本功能只提取身体骨架，遮挡关节与前后深度仍可能需要微调。
+
+### SDPose（可选）
+
+只在选择 SDPose 识别时需要，现有生图/机位模型和 DWPose 权重不用重新下载。
+
+| 文件 | 下载 | 放置目录 |
+|---|---|---|
+| `sdpose_wholebody_fp16.safetensors`（1.92 GB） | [官方文件](https://huggingface.co/Comfy-Org/SDPose/resolve/main/checkpoints/sdpose_wholebody_fp16.safetensors) · [来源与许可](https://huggingface.co/Comfy-Org/SDPose) | `ComfyUI/models/checkpoints/` |
+
+SHA256：`63d01f9a7494560693b24767f4469d59c9d3266b31ff0a253e74d1e611442721`，文件大小 1,916,645,792 字节。
+
+需要 ComfyUI 核心提供 `SDPoseKeypointExtractor`、`SDPoseDrawKeypoints`、`CheckpointLoaderSimple`、`PreviewAny`。无需另装 PZ 插件；节点缺失时先更新 ComfyUI 核心及其依赖并重启后端，再在编辑器点击「检查模型」。识别方式选择 SDPose 后可选择本地 SDPose checkpoint。
+
+该入口按单人提取，多人参考用 DWPose。两个检测器都输出原始关键点，均可进入「修正骨架」再应用，不保证 SDPose 对所有图片都更准确。只更新这些前端工具时，保存当前编辑后 Ctrl+F5 刷新即可；安装新版核心后需重启 ComfyUI。

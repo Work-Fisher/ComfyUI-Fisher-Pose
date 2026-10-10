@@ -1,4 +1,5 @@
 import { app } from "../../scripts/app.js";
+import { openResultHistory } from "./result-history.mjs";
 import { api } from "../../scripts/api.js";
 import { keepIfSame as keepIfUnchanged } from "./apply_state.mjs";
 import { scalarInput, cameraEnabled, setScalarInput } from "./workflow_controls.mjs?v=20261010-feedback2";
@@ -9,7 +10,7 @@ import { repairPoseLinks, validateFisherLinks } from "./pose_links.mjs?v=2026101
 const EDITORS = {
     studio: { url: new URL("./editor/studio.html", import.meta.url), version: "20260922-preview2", title: "Fisher 机位与姿态编辑器",
               fields: ["scene_json", "output_mode", "width", "height", "extra_prompt"], data: "scene_json", image: "reference_image_1" },
-    freePose: { url: new URL("./editor/freepose.html", import.meta.url), version: "20261010-xyz1", title: "Fisher 姿势与镜头",
+    freePose: { url: new URL("./editor/freepose.html", import.meta.url), version: "20261010-toolkit1", title: "Fisher 姿势与镜头",
                 fields: ["pose_json", "extra_prompt"], data: "pose_json", image: "reference_image" },
 };
 const FREE_POSE_NODES = ["FisherQwenFreePose", "FisherPoseImage"];
@@ -447,6 +448,7 @@ app.registerExtension({
             if (scene.element) scene.element.style.display = "none";
             this.addWidget("button", freePose ? "编辑姿势与镜头" : "打开机位与姿态编辑器", null, () => { void openEditor(this).catch(error => app.extensionManager.toast.add({ severity: 'error', summary: 'Fisher Pose', detail: error.message, life: 6000 })); }, { serialize: false });
             this.size = freePose ? [380, 300] : nodeData.name === "FisherQwenPose" ? [420, 470] : [350, 290];
+            if (nodeData.name === 'FisherQwenFreePose') this.addWidget('button', '生成历史与对照', null, () => { void openResultHistory(this, api); }, { serialize: false });
             return result;
         };
         if (!freePose) return;
