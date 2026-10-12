@@ -1,3 +1,6 @@
+import { localizeEditor } from './editor_i18n.mjs';
+import { followComfyLocale } from './i18n.mjs';
+
 // Read the actual completed prompt so previews and detector jobs cannot become final results.
 export function dependsOn(prompt, start, target, seen = new Set()) {
     start = String(start); target = String(target);
@@ -43,7 +46,7 @@ function sourceFile(value) {
     const slash = value.lastIndexOf('/');
     return { filename: value.slice(slash + 1), subfolder: slash < 0 ? '' : value.slice(0, slash), type };
 }
-export async function openResultHistory(node, api) {
+export async function openResultHistory(node, api, app) {
     const dialog = document.createElement('dialog');
     dialog.className = 'fisher-result-history';
     dialog.style.cssText = 'width:min(1100px,94vw);max-height:90vh;padding:24px;border:1px solid #dce2ee;border-radius:18px;background:#f4f6fa;color:#202d43;font:14px system-ui';
@@ -52,7 +55,9 @@ export async function openResultHistory(node, api) {
     const style = document.createElement('style');
     style.textContent = '.fisher-result-history::backdrop{background:#101827aa}.fisher-result-history button{font:inherit;border:1px solid #dbe2ef;border-radius:9px;padding:9px 14px;color:#253652;background:#fff;cursor:pointer}.fisher-result-history button:hover{background:#e9efff;border-color:#879fea}.fisher-result-history button:disabled{opacity:.45;cursor:not-allowed}.fisher-result-history [data-use]{background:#3157d5;color:white;margin-right:8px}.fisher-result-history [data-status],.fisher-result-history [data-detail]{color:#5f6e85;line-height:1.6}.fisher-result-history [data-list] button:focus{outline:2px solid #3157d5}';
     dialog.append(style);
-    const close = () => { dialog.close(); dialog.remove(); };
+    const localization = localizeEditor(window, dialog);
+    const stopLocale = followComfyLocale(app, localization.setLocale);
+    const close = () => { stopLocale(); localization.disconnect(); dialog.close(); dialog.remove(); };
     $('[data-close]').onclick = close;
     dialog.addEventListener('cancel', event => { event.preventDefault(); close(); });
     document.body.append(dialog); dialog.showModal();
@@ -103,6 +108,7 @@ export async function openResultHistory(node, api) {
         for (const record of records) {
             const button = document.createElement('button'); button.style.cssText = 'display:block;width:100%;padding:6px;margin-bottom:8px;border-radius:10px';
             const image = document.createElement('img'); image.src = viewURL(record.file); image.loading = 'lazy'; image.alt = record.file.filename; image.style.cssText = 'width:100%;height:110px;object-fit:contain';
+            button.dataset.i18nSkip = '';
             button.append(image); button.title = record.file.filename; button.onclick = () => select(record); $('[data-list]').append(button);
         }
         if (records.length) select(records[0]);

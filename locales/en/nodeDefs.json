@@ -1,0 +1,322 @@
+{
+  "FisherPoseStudio": {
+    "display_name": "Fisher Camera & Pose",
+    "description": "Pose and position 1–3 people independently with a shared camera. Connect the prompt to prompt, the framed mannequin image to image_2, and the original to image_1. Camera Only mode does not use the pose image.",
+    "inputs": {
+      "output_mode": {
+        "name": "Output Mode",
+        "tooltip": "Camera + Pose (视角＋姿态), Camera Only (仅视角), or Pose Only (仅姿态). Saved option values remain unchanged."
+      },
+      "width": {
+        "name": "Width"
+      },
+      "height": {
+        "name": "Height"
+      },
+      "extra_prompt": {
+        "name": "Additional Instructions"
+      },
+      "scene_json": {
+        "name": "Scene Data"
+      }
+    },
+    "outputs": {
+      "0": {
+        "name": "Prompt"
+      },
+      "1": {
+        "name": "Mannequin Pose Image"
+      },
+      "2": {
+        "name": "Camera Preview"
+      }
+    }
+  },
+  "FisherQwenPose": {
+    "display_name": "Fisher Qwen2.1 Character & Pose Encode",
+    "description": "For Qwen Image 2.1. Connect 1–3 character references in order. The mannequin reference is placed last and bound to the positive prompt. Auto mapping uses image 1 for people in a group photo, or assigns separate images in person-list order. Editor uploads assist skeleton fitting only; they do not replace these image inputs.",
+    "inputs": {
+      "clip": {
+        "name": "CLIP"
+      },
+      "vae": {
+        "name": "VAE"
+      },
+      "reference_image_1": {
+        "name": "Character Photo 1"
+      },
+      "output_mode": {
+        "name": "Output Mode",
+        "tooltip": "Camera + Pose (视角＋姿态), Camera Only (仅视角), or Pose Only (仅姿态). Saved option values remain unchanged."
+      },
+      "width": {
+        "name": "Width"
+      },
+      "height": {
+        "name": "Height"
+      },
+      "reference_resolution": {
+        "name": "Reference Resolution"
+      },
+      "person_1_reference": {
+        "name": "Person 1 Reference",
+        "tooltip": "Auto (自动), or image 1/2/3 (图1/图2/图3). Saved option values remain unchanged."
+      },
+      "person_2_reference": {
+        "name": "Person 2 Reference",
+        "tooltip": "Auto (自动), or image 1/2/3 (图1/图2/图3). Saved option values remain unchanged."
+      },
+      "person_3_reference": {
+        "name": "Person 3 Reference",
+        "tooltip": "Auto (自动), or image 1/2/3 (图1/图2/图3). Saved option values remain unchanged."
+      },
+      "extra_prompt": {
+        "name": "Additional Instructions"
+      },
+      "scene_json": {
+        "name": "Scene Data"
+      },
+      "reference_image_2": {
+        "name": "Character Photo 2"
+      },
+      "reference_image_3": {
+        "name": "Character Photo 3"
+      },
+      "pe_clip": {
+        "name": "Prompt Rewrite CLIP"
+      },
+      "pe_max_tokens": {
+        "name": "Rewrite Max Tokens"
+      },
+      "presence_penalty": {
+        "name": "Presence Penalty"
+      },
+      "thinking": {
+        "name": "Thinking Mode"
+      },
+      "use_default_template": {
+        "name": "Default Rewrite Template",
+        "tooltip": "Use the default prompt-rewrite system template. When off, keep only the JSON output format convention."
+      },
+      "mtp": {
+        "name": "MTP"
+      }
+    },
+    "outputs": {
+      "0": {
+        "name": "Positive"
+      },
+      "1": {
+        "name": "Negative"
+      },
+      "2": {
+        "name": "latent"
+      },
+      "3": {
+        "name": "Actual Prompt"
+      },
+      "4": {
+        "name": "Mannequin Pose Image"
+      },
+      "5": {
+        "name": "Camera Preview"
+      }
+    }
+  },
+  "FisherQwen21GGUFCLIP": {
+    "display_name": "Fisher Qwen2.1 GGUF CLIP Loader",
+    "description": "Load the Qwen3-VL text encoder and its vision projection from GGUF or the vision part of a complete safetensors model.",
+    "inputs": {
+      "clip_name": {
+        "name": "CLIP Model"
+      },
+      "vision_source": {
+        "name": "vision_source",
+        "tooltip": "Choose the matching mmproj F16 GGUF, or the vision part of the complete Qwen3-VL-8B safetensors model."
+      }
+    }
+  },
+  "FisherPoseImage": {
+    "display_name": "Fisher Mannequin Pose Image (Universal)",
+    "description": "Outputs the mannequin image and pose prompt without CLIP or VAE, for image-editing workflows such as Qwen Image 2511. Connect the mannequin to image1 and the whole character photo to image2. A second separate portrait uses image3. The prompt follows the person count automatically.",
+    "inputs": {
+      "extra_prompt": {
+        "name": "Additional Instructions"
+      },
+      "pose_json": {
+        "name": "Pose Data"
+      },
+      "reference_image": {
+        "name": "Character Photo"
+      }
+    },
+    "outputs": {
+      "0": {
+        "name": "Mannequin Pose Image"
+      },
+      "1": {
+        "name": "Prompt"
+      },
+      "2": {
+        "name": "Pose Data"
+      }
+    }
+  },
+  "FisherQwenFreePose": {
+    "display_name": "Fisher Qwen2.1 Free Pose",
+    "description": "Qwen Image 2.1 free posing for 1–2 people using the VNCCS_QI2_PoseStudio LoRA. The mannequin is image1 and the character photo is image2. A group photo uses the whole image: its left/right people map to mannequins 1/2 and can be swapped. Separate Portraits mode uses reference_image_2 as image3. Set mannequin reference size in the editor; node width/height control final output size independently.",
+    "inputs": {
+      "clip": {
+        "name": "CLIP"
+      },
+      "vae": {
+        "name": "VAE"
+      },
+      "reference_image": {
+        "name": "Character Photo"
+      },
+      "width": {
+        "name": "Width"
+      },
+      "height": {
+        "name": "Height"
+      },
+      "reference_resolution": {
+        "name": "Reference Resolution"
+      },
+      "extra_prompt": {
+        "name": "Additional Instructions"
+      },
+      "pose_json": {
+        "name": "Pose Data"
+      },
+      "reference_image_2": {
+        "name": "Character Photo 2"
+      }
+    },
+    "outputs": {
+      "0": {
+        "name": "Positive"
+      },
+      "1": {
+        "name": "Negative"
+      },
+      "2": {
+        "name": "latent"
+      },
+      "3": {
+        "name": "Actual Prompt"
+      },
+      "4": {
+        "name": "Mannequin Pose Image"
+      },
+      "5": {
+        "name": "Pose Data"
+      }
+    }
+  },
+  "FisherAnyAngleCamera": {
+    "display_name": "Fisher AnyAngle Camera",
+    "description": "Render a coarse Gaussian-splat reference using the camera saved in the free-pose editor. For AnyAngle encoding, connect the front result to image1 and the coarse render to image2. Use this node's prompt, CFG 1, and 25 steps.",
+    "inputs": {
+      "splat": {
+        "name": "Gaussian Splat"
+      },
+      "pose_json": {
+        "name": "Pose Data"
+      },
+      "image": {
+        "name": "Front Image",
+        "tooltip": "The front result from the first pass. The coarse render uses its dimensions."
+      },
+      "camera_latent": {
+        "name": "Reconstruction Camera Latent",
+        "tooltip": "Connect the latent output from TripoSplat sampling. Its original camera calibrates the angle; do not connect the front-generation latent."
+      }
+    },
+    "outputs": {
+      "0": {
+        "name": "Coarse Render"
+      },
+      "1": {
+        "name": "AnyAngle Prompt"
+      },
+      "2": {
+        "name": "camera_info"
+      }
+    }
+  },
+  "FisherShot": {
+    "display_name": "Fisher Shot",
+    "description": "Save the editor camera independently. When enable_camera is off, generate only the front pose; turning it on restores the camera workflow. The saved camera and front-generation parameters are preserved.",
+    "inputs": {
+      "pose_json": {
+        "name": "Pose Data"
+      },
+      "shot_json": {
+        "name": "Shot Data"
+      },
+      "enable_camera": {
+        "name": "Enable Camera",
+        "tooltip": "Off: generate the front pose only. On: run the full workflow with the saved editor camera. Turning this off preserves the saved camera."
+      }
+    },
+    "outputs": {
+      "0": {
+        "name": "Pose & Camera"
+      }
+    }
+  },
+  "FisherPoseResult": {
+    "display_name": "Fisher Final Image",
+    "description": "Select the result using the saved editor camera. A front shot returns the front result; other camera angles select the AnyAngle result automatically.",
+    "inputs": {
+      "pose_json": {
+        "name": "Pose Data"
+      },
+      "front_image": {
+        "name": "Front Image"
+      },
+      "camera_image": {
+        "name": "Camera Image"
+      }
+    },
+    "outputs": {
+      "0": {
+        "name": "Final Image"
+      }
+    }
+  },
+  "FisherAnyAngleEncode": {
+    "display_name": "Fisher AnyAngle Encode",
+    "description": "Encode the front result as image1 and the new camera reference as image2 using the fixed AnyAngle prompt.",
+    "inputs": {
+      "clip": {
+        "name": "CLIP"
+      },
+      "vae": {
+        "name": "VAE"
+      },
+      "front_image": {
+        "name": "Front Image"
+      },
+      "camera_image": {
+        "name": "Camera Image"
+      },
+      "resolution": {
+        "name": "Resolution"
+      }
+    },
+    "outputs": {
+      "0": {
+        "name": "Positive"
+      },
+      "1": {
+        "name": "Negative"
+      },
+      "2": {
+        "name": "latent"
+      }
+    }
+  }
+}

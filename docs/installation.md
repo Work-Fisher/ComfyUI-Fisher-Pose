@@ -1,3 +1,5 @@
+[English](installation.en.md) · 中文
+
 # 安装、模型下载与升级
 
 [返回首页](../README.md) · [使用指南](usage.md)

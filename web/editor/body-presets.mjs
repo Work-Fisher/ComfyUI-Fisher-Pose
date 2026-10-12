@@ -1,3 +1,6 @@
+import { translate } from '../i18n.mjs';
+const uiText = text => translate(text, document.documentElement.lang);
+
 // Separate shape presets: never store identity, pose, position or camera.
 const KEY = 'fisher.body-presets.v1';
 const copy = value => JSON.parse(JSON.stringify(value));
@@ -18,18 +21,18 @@ export function createBodyPresets({ storage = localStorage, getPerson, apply, th
             const row = document.createElement('div'); row.className = 'fp-shape-card';
             const use = document.createElement('button'); use.type = 'button'; use.title = `套用到当前人物：${record.name}`;
             if (record.thumbnail) { const img = document.createElement('img'); img.src = record.thumbnail; img.alt = ''; use.append(img); }
-            const name = document.createElement('span'); name.textContent = record.name; use.append(name);
+            const name = document.createElement('span'); name.dataset.i18nSkip = ''; name.textContent = record.name; use.append(name);
             use.onclick = () => apply(copy(record));
             const remove = document.createElement('button'); remove.textContent = '×'; remove.title = `删除 ${record.name}`;
-            remove.onclick = () => { if (confirm(`删除身材「${record.name}」？`)) persist(records.filter(item => item !== record)); };
+            remove.onclick = () => { if (confirm(uiText(`删除身材「${record.name}」？`))) persist(records.filter(item => item !== record)); };
             row.append(use, remove); container.append(row);
         }
     }
     async function save(name) {
-        name = (name ?? prompt('给当前人物的身材起个名字') ?? '').trim().slice(0, 60);
+        name = (name ?? prompt(uiText('给当前人物的身材起个名字')) ?? '').trim().slice(0, 60);
         if (!name) return false;
         const exists = records.find(item => item.name === name);
-        if (exists && !confirm(`覆盖身材「${name}」？`)) return false;
+        if (exists && !confirm(uiText(`覆盖身材「${name}」？`))) return false;
         if (!exists && records.length >= 30) { toast('最多保存30份身材，请先删除不需要的预设'); return false; }
         const record = { name, ...shapeRecord(getPerson()), thumbnail: await thumbnail() };
         const ok = persist([...records.filter(item => item.name !== name), record]);

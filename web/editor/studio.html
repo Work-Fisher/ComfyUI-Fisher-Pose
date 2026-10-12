@@ -27,7 +27,7 @@
 <section><div class="section-heading"><h2>构图</h2><button id="toggle-grid" class="text-button" aria-pressed="false">九宫格</button></div><div class="segmented ratios"><button data-ratio="1:1">1:1</button><button class="active" data-ratio="3:4">3:4</button><button data-ratio="16:9">16:9</button></div><div class="dimensions"><label>宽<input id="output-width" type="number" min="64" max="4096" step="1" value="768"></label><label>高<input id="output-height" type="number" min="64" max="4096" step="1" value="1024"></label></div></section>
 </div>
 <div id="pose-panel" hidden>
-<section><div class="section-heading"><h2 id="actor-heading">人物 01</h2><span id="selected-joint">未选择关节</span></div><label class="field-label">人物名称<input id="actor-name" type="text" maxlength="32"></label><label class="field-label">对应原图中的谁<textarea id="actor-identity" maxlength="300" placeholder="例如：图1左侧穿红衣的人"></textarea></label><p class="muted">用于说明骨架与原图人物的对应关系。不会自动识别人脸或锁定身份。</p>
+<section><div class="section-heading"><h2 id="actor-heading" data-i18n-skip>人物 01</h2><span id="selected-joint">未选择关节</span></div><label class="field-label">人物名称<input id="actor-name" type="text" maxlength="32"></label><label class="field-label">对应原图中的谁<textarea id="actor-identity" maxlength="300" placeholder="例如：图1左侧穿红衣的人"></textarea></label><p class="muted">用于说明骨架与原图人物的对应关系。不会自动识别人脸或锁定身份。</p>
 <label class="slider-label">人物转身<output id="bodyAngle-value"></output></label><input id="bodyAngle" aria-label="人物转身" type="range" min="0" max="359" step="1">
 <p id="actor-facing" class="muted"></p><button id="flip-facing" type="button">转身 180°</button><p class="muted">脸部眼睛和脚下箭头指向人物正面。二维骨架不能自动确定正背面，请在此确认；转身会同时旋转人物姿势。</p>
 <label class="slider-label">左右位置<output id="positionX-value"></output></label><input id="positionX" aria-label="左右位置" type="range" min="-3" max="3" step=".02">
@@ -35,10 +35,11 @@
 <button id="mirror" class="wide">⇄ 镜像当前人物动作</button><button id="reset-pose" class="wide">恢复当前人物站姿</button></section>
 </div>
 <div id="output-panel" hidden>
-<section class="output-settings"><label class="field-label">输出用途<select id="output-mode"><option>视角＋姿态</option><option>仅视角</option><option>仅姿态</option></select></label><p id="mode-help" class="muted"></p><label class="field-label">提示词格式<select id="prompt-style"><option>中文编辑指令</option><option>Multiangle LoRA (&lt;sks&gt;)</option></select></label><p id="style-help" class="muted">中文指令适用于当前 Qwen2.1 工作流。</p><label class="field-label">补充要求<textarea id="extra-prompt" placeholder="例如：保留原图服装与光照"></textarea></label></section>
+<section class="output-settings"><label class="field-label">输出用途<select id="output-mode"><option value="视角＋姿态">视角＋姿态</option><option value="仅视角">仅视角</option><option value="仅姿态">仅姿态</option></select></label><p id="mode-help" class="muted"></p><label class="field-label">提示词格式<select id="prompt-style"><option value="中文编辑指令">中文编辑指令</option><option value="Multiangle LoRA (&lt;sks&gt;)">Multiangle LoRA (&lt;sks&gt;)</option></select></label><p id="style-help" class="muted">中文指令适用于当前 Qwen2.1 工作流。</p><label class="field-label">补充要求<textarea id="extra-prompt" placeholder="例如：保留原图服装与光照"></textarea></label></section>
 </div>
-<section class="description-section"><div class="section-heading"><h2>输出提示词</h2><button id="copy-description" class="text-button">复制</button></div><p id="description"></p><span class="description-note">与当前模式和机位同步</span></section>
+<section class="description-section"><div class="section-heading"><h2>输出提示词</h2><button id="copy-description" class="text-button">复制</button></div><p id="description" data-i18n-skip></p><span class="description-note">与当前模式和机位同步</span></section>
 <div class="output-note"><i></i><span>提示词 → prompt<br>合成骨架图 → image_2，原图 → image_1</span></div>
 </aside></main>
 <footer class="app-footer"><span>Fisher Pose <span class="footer-dot">/</span> Multi-person Studio</span><span>编辑后应用到节点，再运行工作流</span></footer>
+<script type="module">import { localizeEditor } from "../editor_i18n.mjs"; localizeEditor();</script>
 <script type="module" src="studio.mjs?v=20260922-preview2"></script></body></html>

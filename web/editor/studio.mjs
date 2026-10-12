@@ -73,7 +73,7 @@ function renderPeople(){
     state.people.forEach((p,index)=>{
         const button=document.createElement('button');button.className='person-row'+(p.id===state.selectedId?' selected':'');button.dataset.person=p.id;
         const dot=document.createElement('span');dot.className='person-dot';dot.style.background=actorColors[index];
-        const labels=document.createElement('span'),name=document.createElement('b'),detail=document.createElement('small');name.textContent=p.name;detail.textContent=p.identity||'独立动作与站位';labels.append(name,detail);button.append(dot,labels);
+        const labels=document.createElement('span'),name=document.createElement('b'),detail=document.createElement('small');name.setAttribute('data-i18n-skip','');if(p.identity)detail.setAttribute('data-i18n-skip','');name.textContent=p.name;detail.textContent=p.identity||'独立动作与站位';labels.append(name,detail);button.append(dot,labels);
         button.onclick=()=>selectPerson(p.id);$('#people-list').append(button);
     });
     $('#add-person').disabled=state.people.length>=3;$('#duplicate-person').disabled=!state.people.length||state.people.length>=3;$('#delete-person').disabled=!state.people.length;
@@ -225,7 +225,7 @@ function renderShots(){
     shots.forEach((shot,index)=>{
         const wrap=document.createElement('div');wrap.className='shot-wrap';
         const button=document.createElement('button');button.className='shot';const image=document.createElement('img');image.src=shot.image;image.alt=shot.name;
-        const text=document.createElement('span'),name=document.createElement('b'),sub=document.createElement('small');name.textContent=shot.name;sub.textContent=(shot.state.people?.length||1)+' 人 · '+Math.round(shot.state.azimuth)+'°';text.append(name,sub);button.append(image,text);
+        const text=document.createElement('span'),name=document.createElement('b'),sub=document.createElement('small');name.setAttribute('data-i18n-skip','');name.textContent=shot.name;sub.textContent=(shot.state.people?.length||1)+' 人 · '+Math.round(shot.state.azimuth)+'°';text.append(name,sub);button.append(image,text);
         button.onclick=()=>{checkpoint();state=migrate(shot.state);selectedJoint=null;refresh();toast('已恢复所有人物与机位');};
         const remove=document.createElement('button');remove.className='delete';remove.textContent='×';remove.setAttribute('aria-label','删除'+shot.name);remove.onclick=()=>{shots.splice(index,1);renderShots();persist();};
         wrap.append(button,remove);$('#shot-strip').append(wrap);

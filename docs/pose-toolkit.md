@@ -1,6 +1,6 @@
 # 姿势辅助工具
 
-[使用指南](usage.md) · [模型下载](installation.md#sdpose可选)
+[English](pose-toolkit.en.md) · [使用指南](usage.md) · [模型下载](installation.md#sdpose可选)
 
 本次吸收 [ComfyUI-PZ-EasyUse](https://github.com/prinzer/ComfyUI-PZ-EasyUse) 的姿势辅助工具思路，在 Fisher 双人编辑器中重新接入；无需安装另一套编辑器。保留 Fisher 原有双人身份、XYZ、独立镜头与两阶段生成链路。
 
