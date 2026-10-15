@@ -2,12 +2,17 @@ import { loadBodyPack } from './body-pack.mjs?v=20261010-feedback2';
 import { createMovementGizmo } from './movement-gizmo.mjs?v=20261010-xyz1';
 import { detectorOptions, detectionPrompt } from './pose-detector.mjs';
 import { editKeypoints } from './keypoint-editor.mjs';
-import { createBodyPresets, estimateProportions } from './body-presets.mjs';
+// 带 ?v= 才能让浏览器丢掉旧缓存：本文件没有 Cache-Control，只有 Etag/Last-Modified，
+// 浏览器按「启发式缓存」会连请求都不发，改了内容也读不到（保存身材点了没反应就是这么来的）。
+import { createBodyPresets, estimateProportions } from './body-presets.mjs?v=20261014-bodyfix1';
+import { askText, askConfirm } from './dialogs.mjs?v=20261014-dialog1';
 import { restorePoseShape, omitPoseShape } from './pose-shape.mjs';
 import { createReferenceOverlay } from './reference-overlay.mjs';
 // Free-pose editor: one VNCCS MakeHuman mannequin. Editing uses a free orbit view;
 // the output is always the VNCCS front capture (yaw 0 / pitch 0, white background,
 // flat white ambient light), which is what the VNCCS_QI2_PoseStudio LoRA was trained on.
+// A limb folded along that view axis is invisible in the reference, so the editor warns
+// about the joints the front capture cannot read (see reference-view.mjs).
 import { PoseViewerCore } from '../vnccs/vnccs_pose_studio_core.mjs?v=20261010-xyz1';
 import { solveMorph, buildStaticModelData } from '../vnccs/vnccs_pose_morph_runtime.mjs';
 import { HAND_PRESETS } from '../vnccs/vnccs_hand_presets.mjs';
@@ -15,9 +20,10 @@ import { readSkeletonImage } from './pose-import.mjs';
 import { readPoseKeypoints, largestBody, applicableBody, poseOverlay } from './pose-keypoints.mjs?v=20261010-feedback2';
 import { liftOpenPose, WORLD_KEYPOINT_NAMES } from './openpose-lift.mjs';
 import { COMMON_POSES, directionKeypoints } from './common-poses.mjs';
-import { isGroupPose, bindingRuntimeProblem } from '../binding_runtime.mjs';
+import { isTwoPersonPose, bindingRuntimeProblem } from '../binding_runtime.mjs?v=20261014-separate-words1';
 import { reconcilePortraits } from '../portrait_inputs.mjs';
 import { DEFAULT_FRAMING, frontFraming, isTurned, outputShot } from './framing.mjs?v=20261010-feedback2';
+import { hiddenParts, worstVisibility, MIN_SEGMENT_VISIBILITY } from './reference-view.mjs?v=20261014-refhint1';
 
 const $ = selector => document.querySelector(selector);
 const embedded = new URLSearchParams(location.search).has('embedded');
@@ -84,7 +90,7 @@ function instructionText() {
         const order = leftSource === 'left' ? 'Keep' : 'Exchange';
         return `Draw character from image2. Repose the existing two people in image2 to match image1. ${order} their left-to-right order: the person on the viewer's ${leftSource} in image2 takes the left mannequin pose in image1; the person on the viewer's ${rightSource} takes the right mannequin pose. Preserve their appearances and the scene.`;
     }
-    return `Draw the ${first} character from image2 in the pose of the ${first} mannequin in image1, and the ${second} character from image3 in the pose of the ${second} mannequin in image1.`;
+    return `Draw character from image2. Repose the person in image2 to match the ${first} mannequin in image1, and the person in image3 to match the ${second} mannequin in image1. Preserve their appearances and the scene.`;
 }
 const SKELETON_GUIDE_INSTRUCTION = 'The colored skeleton lines and joint markers in image1 are pose guides only; omit them from the finished image.';
 const promptText = () => [instructionText(), doc.outputSkeleton ? SKELETON_GUIDE_INSTRUCTION : '', ...extraPrompt.split('\n').map(line => line.trim())].filter(Boolean).join('\n');
@@ -282,8 +288,68 @@ function capture(width, height) {
     return viewer.capture(width, height, framing.zoom, CAPTURE_BACKGROUND, framing.offsetX, framing.offsetY, FRONT.yaw, FRONT.pitch, doc.outputSkeleton);
 }
 
+// --- Reference readability warning -------------------------------------------
+// The front capture cannot show a limb folded along the view axis, and the model then keeps the
+// pose from image2 (a kneeling mannequin comes out standing). Measured, see reference-view.mjs:
+// turning the mannequin 60° or more transfers such a pose but drags the generated person's facing
+// along with it; a sentence in the prompt transfers it with the facing kept. Both cost the user
+// something, so the editor only names the hidden joints and leaves the choice to them.
+const REFERENCE_LIMBS = [
+    ['左大臂', 'upperarm_l', 'lowerarm_l'], ['右大臂', 'upperarm_r', 'lowerarm_r'],
+    ['左小臂', 'lowerarm_l', 'hand_l'], ['右小臂', 'lowerarm_r', 'hand_r'],
+    ['左大腿', 'thigh_l', 'calf_l'], ['右大腿', 'thigh_r', 'calf_r'],
+    ['左小腿', 'calf_l', 'foot_l'], ['右小腿', 'calf_r', 'foot_r'],
+    ['躯干', 'pelvis', 'head'],
+];
+const REFERENCE_HINT = '正面参考图里这些关节正对镜头，折在身体前后看不出来，模型容易沿用原图的姿势。'
+    + '点「人物转身」的「左侧 / 右侧」把参考图转到侧面重拍：实测要转到 60° 以上模型才会跟着变，'
+    + '出图人物的朝向也会跟着转。想保持朝向，就在「补充要求」里写一句这几段肢体的动作。';
+// Two mannequins are named by the same numbering as the 人物 buttons.
+const personLabel = index => (doc.people ? `人物 ${index + 1} · ` : '');
+
+function referenceParts() {
+    const THREE = viewer.THREE;
+    const parts = [];
+    const collect = (bones, label) => {
+        for (const [joint, from, to] of REFERENCE_LIMBS) {
+            const head = bones?.[from], tail = bones?.[to];
+            if (!head || !tail) continue;
+            const start = head.getWorldPosition(new THREE.Vector3());
+            const end = tail.getWorldPosition(new THREE.Vector3());
+            parts.push({ name: label + joint, segment: [end.x - start.x, end.y - start.y, end.z - start.z] });
+        }
+    };
+    // Bones hang under the mesh that 人物转身 rotates, so their world matrices carry the turn.
+    viewer.skinnedMesh?.updateMatrixWorld(true);
+    collect(viewer.bones, personLabel(doc.active ?? 0));
+    for (const [key, entry] of viewer.passiveCharacters) {
+        entry.mesh.updateMatrixWorld(true);
+        collect(entry.bones, personLabel(Number(key.split('-')[1])));
+    }
+    return parts;
+}
+
+// null so the first update logs a baseline; the guard keeps joint drags from rewriting the DOM.
+let referenceHint = null;
+function updateReferenceHint() {
+    const parts = referenceParts();
+    const hidden = hiddenParts(parts);
+    const text = hidden.map(part => part.name).join('、');
+    if (text === referenceHint) return;
+    referenceHint = text;
+    const element = $('#reference-hint');
+    element.hidden = !text;
+    element.textContent = text ? `⚠ 参考图看不清：${text}` : '';
+    element.title = text ? REFERENCE_HINT : '';
+    console.info(`[fisher-pose] 参考图可读性 最差 ${worstVisibility(parts).toFixed(2)}`
+        + `（低于 ${MIN_SEGMENT_VISIBILITY} 视为正对镜头）` + (text ? `，看不清：${text}` : '，全部可见'));
+}
+
+$('#reference-hint').onclick = () => { if (referenceHint) toast(REFERENCE_HINT); };
+
 function schedulePreview() {
     if (!ready) return;
+    updateReferenceHint();
     requestAutoFit();
     if (previewTimer) return;
     const revision = ++previewRevision;
@@ -624,7 +690,7 @@ async function addFiles(files) {
 }
 
 $('#clear-gallery').onclick = async () => {
-    if (!libraryAvailable || !confirm(`清空我的图库中的 ${galleries.library.length} 张骨架图？\n（删除 ComfyUI/input/fisher_openpose 里的副本，原文件夹和 FISHER小彩蛋 不受影响）`)) return;
+    if (!libraryAvailable || !(await askConfirm(`清空我的图库中的 ${galleries.library.length} 张骨架图？\n（删除 ComfyUI/input/fisher_openpose 里的副本，原文件夹和 FISHER小彩蛋 不受影响）`, { danger: true }))) return;
     await fetch(LIBRARY_URL + '/clear', { method: 'POST' });
     await loadLibrary();
     toast('我的图库已清空');
@@ -651,6 +717,9 @@ galleryBox.addEventListener('drop', event => { event.preventDefault(); galleryBo
 // --- 我的姿势: whole editor states saved on the server (see saved_poses.py) ---
 
 const SAVED_URL = '/fisher_pose/saved_poses';
+// 列表单独一条路径：/fisher_pose/saved_poses 上同时有 GET 和 POST，热重载类插件同步路由时会按「路径」
+// 把该路径下所有方法的 handler 刷成最后注册的那个（GET 被 POST 抢走），列表请求就会拿到 400。
+const SAVED_LIST_URL = '/fisher_pose/saved_pose_list';
 let savedPoses = [];
 let savedAvailable = false;
 let activeSavedName = null;
@@ -675,10 +744,13 @@ function renderSaved() {
 
 async function loadSavedList() {
     try {
-        const response = await fetch(SAVED_URL, { cache: 'no-store' });
+        const response = await fetch(SAVED_LIST_URL, { cache: 'no-store' });
         if (response.ok) {
             savedPoses = (await response.json()).poses;
             savedAvailable = true;
+            console.log(`[Fisher Pose] 已存姿势列表：${savedPoses.length} 个`);
+        } else {
+            console.warn(`[Fisher Pose] 已存姿势列表请求失败：HTTP ${response.status}，保存按钮将保持禁用`);
         }
     } catch { /* standalone preview without the ComfyUI server */ }
     renderSaved();
@@ -697,8 +769,9 @@ const postPose = (name, record, overwrite) => fetch(SAVED_URL, {
 });
 
 async function saveCurrentPose(presetName) {
-    if (!savedAvailable || !ready) return;
-    const name = (typeof presetName === 'string' ? presetName : prompt('给这个姿势起个名字', defaultPoseName()))?.trim();
+    if (!ready) return;
+    if (!savedAvailable) { console.warn('[Fisher Pose] 保存不可用：姿势接口没连上，请查看控制台里上面那条列表请求的错误'); toast('保存不可用：连不上 ComfyUI 的姿势接口'); return; }
+    const name = (typeof presetName === 'string' ? presetName : await askText('给这个姿势起个名字', defaultPoseName()))?.trim();
     if (!name) return;
     await viewer.waitForCaptureReady();
     const scale = 256 / Math.max(doc.width, doc.height);
@@ -714,7 +787,7 @@ async function saveCurrentPose(presetName) {
     try {
         let response = await postPose(name, record, false);
         if (response.status === 409) {
-            if (!confirm(`已有名为「${name}」的姿势，要覆盖吗？`)) return;
+            if (!(await askConfirm(`已有名为「${name}」的姿势，要覆盖吗？`))) return;
             response = await postPose(name, record, true);
         }
         const result = await response.json();
@@ -746,7 +819,7 @@ async function loadSavedPose(entry) {
 }
 
 async function deleteSavedPose(entry, skipConfirm = false) {
-    if (!skipConfirm && !confirm(`删除姿势「${entry.name}」？`)) return;
+    if (!skipConfirm && !(await askConfirm(`删除姿势「${entry.name}」？`, { danger: true }))) return;
     try {
         await fetch(`${SAVED_URL}/${encodeURIComponent(entry.name)}/delete`, { method: 'POST' });
         if (activeSavedName === entry.name) activeSavedName = null;
@@ -975,6 +1048,7 @@ function removePerson() {
     forgetHistory();
     fitFrame(false);
     refreshPeople();
+    updateReferenceHint(); // the removed mannequin's joints must leave the warning
     $('#import-status').textContent = '已删除人物 2。';
 }
 
@@ -1321,6 +1395,7 @@ function refreshControls() {
     $('#description').textContent = promptText();
     refreshBoneSliders();
     refreshMovementTool();
+    updateReferenceHint();
 }
 
 // One undo entry per slider gesture: record before the first input event.
@@ -1423,7 +1498,7 @@ async function checkEnvironment() {
     try {
         const env = await (await fetch('/fisher_pose/env', { cache: 'no-store' })).json();
         const problem = !env.qwen21 ? `${env.updateHint}（当前版本 ${env.version}）`
-            : isGroupPose(doc, secondReferenceConnected) ? bindingRuntimeProblem(env, location.origin) : '';
+            : isTwoPersonPose(doc) ? bindingRuntimeProblem(env, location.origin) : '';
         $('#env-banner').textContent = problem;
         $('#env-banner').hidden = !problem;
     } catch { /* standalone preview, or AIFISHER Canvas which does not proxy this route */ }
@@ -1482,6 +1557,7 @@ async function serialize() {
     clearTimeout(autoFitTimer); autoFitTimer = null;
     autoFrame();
     await viewer.waitForCaptureReady();
+    updateReferenceHint(); // log the readability of this very capture: "the pose did not follow" reports start here
     const poseReference = capture(doc.width, doc.height);
     updateCamera(false);
     doc.pose = savedPose();
@@ -1557,7 +1633,7 @@ async function start(payload) {
     loadModel(doc.pose);
     rebuildPassives();
     referenceOverlay = createReferenceOverlay(viewer);
-    bodyPresets = createBodyPresets({ getPerson: () => doc, apply: applyBodyShape, toast, container: $('#body-presets'),
+    bodyPresets = createBodyPresets({ getPerson: () => doc, apply: applyBodyShape, toast, container: $('#body-presets'), askText, askConfirm,
         thumbnail: async () => { await viewer.waitForCaptureReady(); const scale = 128 / Math.max(doc.width, doc.height); const thumbnail = capture(Math.round(doc.width * scale), Math.round(doc.height * scale)); updateCamera(false); return thumbnail; } });
     movementGizmo = createMovementGizmo(viewer, {
         getTransform: () => doc.transform,

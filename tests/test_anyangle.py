@@ -44,7 +44,15 @@ def pose_json(position, forward, aspect=1.0, fov=35.0, enabled=True):
 
 
 # The real coarse render needs ComfyUI's RenderSplat; a gradient with out-of-range values stands in.
-anyangle.render_coarse = lambda splat, camera, width, height: torch.linspace(-0.2, 1.3, width * height * 3).reshape(1, height, width, 3)
+render_backgrounds = []
+
+
+def fake_render(splat, camera, width, height, background):
+    render_backgrounds.append(background)
+    return torch.linspace(-0.2, 1.3, width * height * 3).reshape(1, height, width, 3)
+
+
+anyangle.render_coarse = fake_render
 
 
 class AnyAngleCameraTests(unittest.TestCase):
@@ -61,6 +69,20 @@ class AnyAngleCameraTests(unittest.TestCase):
         self.assertEqual(coarse.dtype, torch.float32)
         self.assertGreaterEqual(float(coarse.min()), 0.0)
         self.assertLessEqual(float(coarse.max()), 1.0)
+
+    def test_coarse_render_keeps_the_front_result_background(self):
+        # Turning the camera on must not flip a white studio shot to the old constant black frame.
+        for pixel, expected in ((1.0, "#ffffff"), (0.0, "#000000")):
+            render_backgrounds.clear()
+            anyangle.FisherAnyAngleCamera().camera(fake_splat(person()), pose_json([0, 0, 2.5], [0, 0, -1]),
+                                                   torch.full((1, 64, 96, 3), pixel), camera_latent())
+            self.assertEqual(render_backgrounds, [expected])
+
+    def test_background_ignores_a_limb_on_the_frame_edge(self):
+        frame = torch.ones(1, 64, 96, 3)
+        frame[0, :, :8] = torch.tensor([0.2, 0.1, 0.05])  # an arm entering from the left
+        frame[0, 0, 40:] = torch.tensor([0.6, 0.5, 0.4])  # a hand over the top edge
+        self.assertEqual(anyangle.background_hex(frame), "#ffffff")
 
     def test_editor_front_lands_where_triposplat_shows_the_input(self):
         info, width, height, prompt = self.camera(position=[0, 0, 2.5], forward=[0, 0, -1])

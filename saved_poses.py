@@ -5,6 +5,7 @@ browsers and plugin updates. The record holds the whole editor state (bone rotat
 shape, proportions, framing, mannequin size, grip sliders) plus a small front-capture thumbnail.
 """
 import json
+import logging
 import os
 import time
 
@@ -104,13 +105,20 @@ def register_routes():
 
     user_directory = folder_paths.get_user_directory
 
-    @routes.get("/fisher_pose/saved_poses")
+    # 列表为什么单独一条路径：热重载类插件（如 comfyui_lg_hotreload）同步路由时按「路径」找资源，
+    # 会把该路径下所有方法的 handler 刷成最后注册的那个，GET 会被 POST 抢走 → 前端拿 400 → 保存按钮被禁用。
+    # 所以同一路径只保留一种方法，列表用 /fisher_pose/saved_pose_list 独立开。
+    @routes.get("/fisher_pose/saved_pose_list")
     async def get_poses(request):
-        return web.json_response({"poses": list_poses(user_directory())})
+        poses = list_poses(user_directory())
+        logging.info('[Fisher Pose] 列出已存姿势 %d 个', len(poses))
+        return web.json_response({"poses": poses})
 
     @routes.get("/fisher_pose/saved_poses/{name}")
     async def get_pose(request):
-        record = read_pose(user_directory(), request.match_info["name"])
+        name = request.match_info["name"]
+        record = read_pose(user_directory(), name)
+        logging.info('[Fisher Pose] 读取姿势 %r：%s', name, "命中" if record is not None else "不存在")
         return web.json_response(record) if record is not None else web.Response(status=404)
 
     @routes.post("/fisher_pose/saved_poses")
@@ -118,12 +126,21 @@ def register_routes():
         try:
             body = await request.json()
         except ValueError:
+            logging.warning('[Fisher Pose] 保存姿势失败：请求体不是合法 JSON')
             return web.json_response({"error": "请求格式错误"}, status=400)
         status, message = save_pose(user_directory(), body.get("name"), body.get("record"), bool(body.get("overwrite")))
         if status == "saved":
+            logging.info('[Fisher Pose] 已保存姿势 %r（覆盖=%s）', message, bool(body.get("overwrite")))
             return web.json_response({"name": message})
+        logging.warning('[Fisher Pose] 保存姿势被拒（%s）：%s', status, message)
         return web.json_response({"error": message}, status=409 if status == "exists" else 400)
 
     @routes.post("/fisher_pose/saved_poses/{name}/delete")
     async def post_delete(request):
-        return web.json_response({"removed": delete_pose(user_directory(), request.match_info["name"])})
+        name = request.match_info["name"]
+        removed = delete_pose(user_directory(), name)
+        logging.info('[Fisher Pose] 删除姿势 %r：%s', name, "成功" if removed else "不存在")
+        return web.json_response({"removed": removed})
+
+    logging.info('[Fisher Pose] 已注册保存姿势路由：GET /fisher_pose/saved_pose_list、GET /fisher_pose/saved_poses/{name}、'
+                 'POST /fisher_pose/saved_poses、POST /fisher_pose/saved_poses/{name}/delete')

@@ -11,6 +11,7 @@ python tests/test_anyangle.py
 python tests/test_free_pose.py <ComfyUI 目录>
 python tests/test_qwen_bridge.py <ComfyUI 目录>
 node tests/test_openpose_lift.mjs
+node tests/test_reference_view.mjs
 node --test tests/test_apply_state.mjs
 node --test tests/test_workflow_controls.mjs
 node --test tests/test_binding_runtime.mjs

@@ -52,8 +52,12 @@ def instruction(pose_json=None, reference_mode=None):
         return (f"{VNCCS_INSTRUCTION}. Repose the existing two people in image2 to match image1. "
                 f"{order} their left-to-right order: the person on the viewer's {left_source} in image2 takes the left mannequin pose in image1; "
                 f"the person on the viewer's {right_source} takes the right mannequin pose. Preserve their appearances and the scene.")
-    return (f"Draw the {first} character from image2 in the pose of the {first} mannequin in image1, "
-            f"and the {second} character from image3 in the pose of the {second} mannequin in image1.")
+    # Two photos keep the validated shape of the group wording: state the VNCCS trigger once,
+    # then bind each photo to a mannequin. Repeating a "Draw ... character" clause per photo is
+    # the wording recorded in docs/duo-validation.md as drawing the person twice.
+    return (f"{VNCCS_INSTRUCTION}. Repose the person in image2 to match the {first} mannequin in image1, "
+            f"and the person in image3 to match the {second} mannequin in image1. "
+            "Preserve their appearances and the scene.")
 
 
 def free_pose_prompt(extra="", pose_json=None, reference_mode=None):

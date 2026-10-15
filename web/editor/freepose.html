@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Fisher Pose · 姿势与镜头</title><link rel="icon" href="data:,"><link rel="stylesheet" href="style.css"><link rel="stylesheet" href="freepose.css?v=20261010-toolkit-hint1"></head>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Fisher Pose · 姿势与镜头</title><link rel="icon" href="data:,"><link rel="stylesheet" href="style.css"><link rel="stylesheet" href="freepose.css?v=20261014-dialog1"></head>
 <body>
 <header class="appbar"><div class="brand"><span class="brand-icon">⌘</span><b>Fisher Pose</b><span class="divider"></span><span>姿势与镜头</span><small>摆好动作，定好镜头，再生成</small></div><div class="header-actions"><span id="save-status">编辑后应用到节点</span><button id="undo" title="撤销 Ctrl+Z">↶ 撤销</button><button id="redo" title="重做 Ctrl+Shift+Z">↷</button><button id="cancel-editor">取消</button><button id="apply-editor" disabled>仅应用</button><button class="primary" id="generate-editor" hidden>应用并生成</button></div></header>
 <main class="fp-main">
@@ -48,7 +48,7 @@
 <div id="env-banner" class="fp-banner" role="alert" hidden></div>
 <div id="loading" class="fp-loading"><div class="fp-spinner"></div><span id="loading-text">正在加载 MakeHuman 人体（约 86MB）…</span></div><div id="toast" role="status"></div></div>
 <div class="fp-output-tools" aria-label="构图与参考图设置"><div class="fp-fit-tools"><label class="fp-toggle" title="动作变化时自动调整构图；手动调镜头远近或平移后关闭"><input id="auto-fit" type="checkbox" role="switch" checked><span class="fp-toggle-track" aria-hidden="true"></span><span>自动全身入框</span></label><button id="fit-frame" title="将全部人物适配到拍摄画框；特写请关闭自动全身入框">立即适配</button></div><label class="fp-toggle" title="把骨骼线与关节点一起送入模型作为姿势参考"><input id="output-skeleton" type="checkbox" role="switch"><span class="fp-toggle-track" aria-hidden="true"></span><span>骨骼参考<small>随人偶图输出</small></span></label></div>
-<div class="interaction-bar"><span id="shot-status">正面镜头</span><span>输出 <b id="final-size"></b></span></div></div>
+<div class="interaction-bar"><span id="shot-status">正面镜头</span><span id="reference-hint" role="status" hidden></span><span>输出 <b id="final-size"></b></span></div></div>
 <aside class="right-panel">
 <div class="panel-tabs"><button class="active" data-tab="output">镜头</button><button data-tab="pose">关节</button><button data-tab="body">体型</button><button data-tab="proportion">比例</button></div>
 <div id="output-panel">
@@ -92,4 +92,5 @@
 <section class="description-section"><div class="section-heading"><h2>提示词</h2><button id="copy-description" class="text-button">复制</button></div><label class="field-label">补充要求（建议英文）<textarea id="extra-prompt" placeholder="例如：keep the outfit, soft studio light"></textarea></label><p id="description"></p><span class="description-note">补充要求会在生成时一并使用</span></section></details>
 </aside></main>
 <footer class="app-footer"><span>Fisher Pose <span class="footer-dot">/</span> Free Pose · mannequin core © MiuProject (MIT)</span><span>调整完成后点「应用并生成」</span></footer>
-<script type="module" src="freepose.mjs?v=20261010-toolkit-hint1"></script></body></html>
+<script type="module" src="freepose.mjs?v=20261014-bodyfix2"></script>
+</body></html>

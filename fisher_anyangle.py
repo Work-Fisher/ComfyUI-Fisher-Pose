@@ -11,6 +11,7 @@ ComfyUI's own AnyAngle workflow and AnyAngle Studio T8); with the model card's o
 the camera did not move. The workflow uses a fixed seed for repeatable comparisons.
 """
 import json
+import logging
 import math
 
 import torch
@@ -120,11 +121,24 @@ def save_preview(image):
     return [{"filename": name, "subfolder": "", "type": "temp"}]
 
 
-def render_coarse(splat, camera, width, height):
+def background_hex(image):
+    """The front result's background, so the coarse render sits on the same one.
+
+    This used to be a constant black. The AnyAngle pass then repainted the background along with
+    everything else, so turning on the camera branch flipped a white studio shot to black. The
+    border median ignores a limb that reaches the frame edge.
+    """
+    frame = image[0].float()
+    border = torch.cat((frame[0], frame[-1], frame[:, 0], frame[:, -1]))
+    rgb = (border.median(dim=0).values.clamp(0, 1) * 255).round().to(torch.int64)
+    return "#{:02x}{:02x}{:02x}".format(*rgb.tolist())
+
+
+def render_coarse(splat, camera, width, height, background):
     from comfy_extras.nodes_gaussian_splat import RenderSplat
     result = RenderSplat.execute(splat=splat, width=width, height=height, frames=1, splat_scale=1.0, sharpen=2.0,
                                  headlight_shading=0.0, opacity_threshold=0.0, render_style="color",
-                                 background="#000000", camera_info=camera)
+                                 background=background, camera_info=camera)
     return (result.result if hasattr(result, "result") else result)[0]
 
 
@@ -157,7 +171,9 @@ class FisherAnyAngleCamera:
             raise ValueError("高斯溅射是空的：检查人物抠图（RemoveBackground）是否抠到了人。")
         width, image_height = render_size(int(image.shape[2]), int(image.shape[1]))
         camera = camera_info(angle["camera"], center, height, width, image_height, basis)
-        coarse = render_coarse(splat, camera, width, image_height)[..., :3].float().cpu().clamp(0, 1)
+        background = background_hex(image)
+        logging.info('[Fisher AnyAngle] 粗渲染 %dx%d，背景 %s（取自正面结果）', width, image_height, background)
+        coarse = render_coarse(splat, camera, width, image_height, background)[..., :3].float().cpu().clamp(0, 1)
         return {"ui": {"images": save_preview(coarse)}, "result": (coarse, ANYANGLE_PROMPT, camera)}
 
 

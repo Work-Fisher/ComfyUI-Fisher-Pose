@@ -19,8 +19,12 @@
 .fp-gallery{display:grid;grid-template-columns:1fr 1fr;gap:6px;max-height:360px;overflow-y:auto;border-radius:8px}
 .fp-gallery.drag{outline:2px dashed var(--blue);outline-offset:2px}
 .fp-gallery p{grid-column:1/-1;margin:0}
-.fp-thumb{padding:0;border:2px solid transparent;border-radius:6px;background:#000;overflow:hidden;aspect-ratio:3/2;position:relative}
-.fp-thumb img{width:100%;height:100%;object-fit:contain;display:block}
+/* 缩略图高度只能用 padding 撑开，不能用 aspect-ratio：Chromium 144（ComfyUI Desktop 内置引擎）
+   在「网格容器同时是滚动容器（内容超出 max-height）」时，算 auto 行高会丢掉网格项 aspect-ratio
+   转出的高度，行高塌成「边框 + 一行文字」，卡片相互重叠。百分比 padding 按列宽解析，再减掉上下
+   边框 4px，高度即精确等于 列宽×(高/宽)。同理 .fp-saved(1:1)、.fp-mannequin(3:4) 各自覆盖。 */
+.fp-thumb{padding:0 0 calc(66.6667% - 4px);height:0;border:2px solid transparent;border-radius:6px;background:#000;overflow:hidden;position:relative}
+.fp-thumb img{position:absolute;left:0;top:0;width:100%;height:100%;object-fit:contain;display:block}
 .fp-thumb span{position:absolute;left:0;right:0;bottom:0;font-size:8px;color:#dfe6f5;background:#000a;padding:1px 3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:left}
 .fp-thumb.active{border-color:#6e8cff}
 .fp-thumb.failed{opacity:.35}
@@ -45,14 +49,14 @@
 .fp-sources{margin-bottom:10px}.fp-sources button{padding:5px 3px;font-size:11px;white-space:normal;line-height:1.35}
 .fp-save{margin-bottom:10px;border-color:#c5d2fb;color:#3858cc;background:#f3f6ff}
 .fp-save:hover{background:#e8eeff}
-.fp-saved .fp-thumb{background:#fff;border-color:#e3e8f1;aspect-ratio:1}
+.fp-saved .fp-thumb{background:#fff;border-color:#e3e8f1;padding-bottom:calc(100% - 4px)}
 .fp-saved .fp-thumb.active{border-color:#6e8cff}
 .fp-saved .fp-thumb span{color:#fff;background:#1a1f2ecc;font-size:9px;padding:2px 4px}
 .fp-delete{position:absolute;top:3px;right:3px;width:18px;height:18px;border-radius:50%;background:#1a1f2eb0;color:#fff;font-size:12px;font-style:normal;line-height:18px;text-align:center;opacity:0;cursor:pointer}
 .fp-saved .fp-thumb:hover .fp-delete{opacity:1}
 .fp-delete:hover{background:#e5484d}
 .fp-banner{position:absolute;top:56px;left:18px;right:18px;z-index:7;background:#fff1f0;border:1px solid #f3b1ab;color:#9b2c24;border-radius:8px;padding:10px 14px;font-size:12px;line-height:1.7;box-shadow:0 6px 20px #0003}
-.fp-thumb.fp-mannequin{background:#fff;border-color:#e3e8f1;aspect-ratio:3/4}
+.fp-thumb.fp-mannequin{background:#fff;border-color:#e3e8f1;padding-bottom:calc(133.3333% - 4px)}
 .fp-thumb.fp-mannequin.active{border-color:#6e8cff}
 .fp-thumb.fp-mannequin span{color:#fff;background:#1a1f2ecc;font-size:9px;padding:2px 4px}
 .fp-detect{margin:0 0 10px}
@@ -99,6 +103,7 @@ button:focus-visible,summary:focus-visible{outline:2px solid #315acd;outline-off
 .fp-people button:hover{background:#3e4964;color:white}
 .fp-people button.active:hover{background:#e4ebfb;color:#243c70}
 .interaction-bar{padding:8px 2px;font-size:11px;color:#68758b;min-height:30px}
+#reference-hint{color:#a35a12;font-weight:600;max-width:46%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .fp-binding{padding-bottom:18px;border-bottom:1px solid var(--line)}
 .fp-binding .section-heading{margin-bottom:12px}
 .fp-binding .section-heading>span{font-size:10px;color:#68758b}
@@ -147,3 +152,19 @@ button:focus-visible,summary:focus-visible{outline:2px solid #315acd;outline-off
 .fp-keypoint-dialog{width:min(1000px,94vw);height:90vh;max-height:94vh;padding:0;border:1px solid #dce3ed;border-radius:14px;background:#f5f7fb;color:#253249;box-shadow:0 20px 80px #0005}
 .fp-keypoint-dialog::backdrop{background:#14182799}.fp-keypoint-dialog header{display:flex;align-items:center;gap:10px;padding:14px 18px;background:#fff}.fp-keypoint-dialog header b{margin-right:auto}.fp-keypoint-dialog button,.fp-keypoint-dialog select{padding:7px 10px;font:inherit;font-size:13px;border:1px solid #dce3ed;border-radius:7px;background:#fff;color:#334155;cursor:pointer}.fp-keypoint-dialog .primary{background:#3157d5;color:white}
 .fp-keypoint-tools{display:flex;flex-wrap:wrap;gap:7px;align-items:center;padding:12px 18px}.fp-keypoint-dialog p{margin:0;padding:0 18px 10px;font-size:12px;color:#64748b}.fp-keypoint-canvas{height:calc(100% - 170px);min-height:200px;background:#151825;margin:0 18px 18px;border-radius:9px}.fp-keypoint-canvas svg{display:block;width:100%;height:100%}
+/* 页面内弹窗（dialogs.mjs）。原生 prompt 在 ComfyUI Desktop 的 Electron 里不可用（调用即抛
+   Error: prompt() is not supported.），所以取名和确认一律用这个 <dialog>，进 top layer、
+   不被编辑器面板遮挡，也不阻塞 JS。 */
+.fp-dialog{margin:auto;width:min(420px,88vw);padding:0;border:1px solid #dce3ed;border-radius:12px;background:#fff;color:#263347;box-shadow:0 20px 60px #10182840}
+.fp-dialog::backdrop{background:#10182866}
+.fp-dialog-box{display:flex;flex-direction:column;gap:11px;padding:16px 18px}
+.fp-dialog-text{margin:0;font-size:13px;line-height:1.6;white-space:pre-wrap;word-break:break-word}
+.fp-dialog-input{width:100%;padding:8px 10px;border:1px solid #dce3ed;border-radius:7px;font:inherit;font-size:13px;color:#263347}
+.fp-dialog-input:focus{outline:2px solid #315acd;outline-offset:1px}
+.fp-dialog-actions{display:flex;justify-content:flex-end;gap:8px}
+.fp-dialog-actions button{padding:7px 14px;font-size:12px;border:1px solid #dce3ed;border-radius:7px;background:#fff;color:#46556d;cursor:pointer}
+.fp-dialog-actions button:hover{background:#f2f5fa}
+.fp-dialog-actions .fp-dialog-ok{border-color:#315acd;background:#315acd;color:#fff}
+.fp-dialog-actions .fp-dialog-ok:hover{background:#2a4fb6}
+.fp-dialog-danger .fp-dialog-actions .fp-dialog-ok{border-color:#e5484d;background:#e5484d}
+.fp-dialog-danger .fp-dialog-actions .fp-dialog-ok:hover{background:#cf3d42}

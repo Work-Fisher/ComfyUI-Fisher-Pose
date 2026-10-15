@@ -4,7 +4,7 @@ const copy = value => JSON.parse(JSON.stringify(value));
 export function shapeRecord(person) {
     return { mesh: { ...person.mesh }, proportions: { ...person.proportions } };
 }
-export function createBodyPresets({ storage = localStorage, getPerson, apply, thumbnail, toast, container }) {
+export function createBodyPresets({ storage = localStorage, getPerson, apply, thumbnail, toast, container, askText, askConfirm }) {
     let records = [];
     try { records = JSON.parse(storage.getItem(KEY) || '[]').filter(v => v.name && v.mesh && v.proportions).slice(0, 30); } catch {}
     function persist(next) {
@@ -21,15 +21,15 @@ export function createBodyPresets({ storage = localStorage, getPerson, apply, th
             const name = document.createElement('span'); name.textContent = record.name; use.append(name);
             use.onclick = () => apply(copy(record));
             const remove = document.createElement('button'); remove.textContent = '×'; remove.title = `删除 ${record.name}`;
-            remove.onclick = () => { if (confirm(`删除身材「${record.name}」？`)) persist(records.filter(item => item !== record)); };
+            remove.onclick = async () => { if (await askConfirm(`删除身材「${record.name}」？`, { danger: true })) persist(records.filter(item => item !== record)); };
             row.append(use, remove); container.append(row);
         }
     }
     async function save(name) {
-        name = (name ?? prompt('给当前人物的身材起个名字') ?? '').trim().slice(0, 60);
+        name = (name ?? await askText('给当前人物的身材起个名字') ?? '').trim().slice(0, 60);
         if (!name) return false;
         const exists = records.find(item => item.name === name);
-        if (exists && !confirm(`覆盖身材「${name}」？`)) return false;
+        if (exists && !(await askConfirm(`覆盖身材「${name}」？`))) return false;
         if (!exists && records.length >= 30) { toast('最多保存30份身材，请先删除不需要的预设'); return false; }
         const record = { name, ...shapeRecord(getPerson()), thumbnail: await thumbnail() };
         const ok = persist([...records.filter(item => item.name !== name), record]);

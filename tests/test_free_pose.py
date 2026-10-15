@@ -144,14 +144,27 @@ class TwoPeopleTests(unittest.TestCase):
     def test_second_person_is_image3_and_named_by_side(self):
         args = self.args(pose_json=two_people(), reference_image_2=torch.full((1, 64, 48, 3), .6))
         prompt = FisherQwenFreePose().encode(**args)['result'][3]
-        self.assertEqual(prompt, 'Draw the left character from image2 in the pose of the left mannequin in image1, '
-                                 'and the right character from image3 in the pose of the right mannequin in image1.')
+        self.assertEqual(prompt, 'Draw character from image2. Repose the person in image2 to match the left mannequin in image1, '
+                                 'and the person in image3 to match the right mannequin in image1. '
+                                 'Preserve their appearances and the scene.')
         images = args['clip'].calls[0][1]['images']
         self.assertEqual(len(images), 3)
         self.assertAlmostEqual(float(images[2].mean()), .6, delta=1 / 255)  # person 2 is image3
 
+    def test_two_photos_keep_the_single_vnccs_trigger(self):
+        # docs/duo-validation.md: the old pair of "Draw the X character ..." clauses was the
+        # wording that duplicated the person. Two photos now state the trigger once, like the
+        # group wording, and bind each photo to a mannequin by side.
+        for prompt in (free_pose_prompt('', two_people()), free_pose_prompt('', two_people((6.0, -3.0)))):
+            self.assertTrue(prompt.startswith('Draw character from image2.'))
+            self.assertEqual(prompt.count('Draw'), 1)
+            self.assertEqual(prompt.count('mannequin in image1'), 2)
+            self.assertIn('Preserve their appearances and the scene.', prompt)
+
     def test_sides_follow_where_people_stand(self):
-        self.assertTrue(free_pose_prompt('', two_people((6.0, -3.0))).startswith('Draw the right character from image2'))
+        prompt = free_pose_prompt('', two_people((6.0, -3.0)))
+        self.assertIn('the person in image2 to match the right mannequin in image1', prompt)
+        self.assertIn('the person in image3 to match the left mannequin in image1', prompt)
 
     def test_group_photo_stays_whole_even_with_legacy_split(self):
         data = json.loads(two_people()); data['referenceMode'] = 'group'
